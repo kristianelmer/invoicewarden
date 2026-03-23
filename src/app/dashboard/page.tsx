@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CustomersManager } from "@/components/customers-manager";
 import { BillingControls } from "@/components/billing-controls";
+import { InvoicesManager } from "@/components/invoices-manager";
 import { getStripeClient } from "@/lib/stripe";
 
 const ACTIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
@@ -59,21 +60,43 @@ export default async function DashboardPage({
     }
   }
 
-  const [{ data: customers }, { data: subscription }] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id,name,email,company,notes,created_at")
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("billing_subscriptions")
-      .select("status,current_period_end")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-  ]);
+  const [{ data: customers }, { data: subscription }, { data: invoices }] =
+    await Promise.all([
+      supabase
+        .from("customers")
+        .select("id,name,email,company,notes,created_at")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("billing_subscriptions")
+        .select("status,current_period_end")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("invoices")
+        .select(
+          "id,invoice_number,currency,amount_cents,issue_date,due_date,status,paid_at,customer:customers(name,email),created_at"
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+    ]);
 
   const isActive = subscription?.status
     ? ACTIVE_STATUSES.has(subscription.status)
     : false;
+
+  const normalizedInvoices = (invoices ?? []).map((inv) => {
+    const customerRaw = inv.customer as unknown;
+    const customer = Array.isArray(customerRaw) ? customerRaw[0] : customerRaw;
+    return {
+      ...inv,
+      customer: customer
+        ? {
+            name: (customer as { name?: string }).name ?? "Client",
+            email: (customer as { email?: string }).email ?? "",
+          }
+        : undefined,
+    };
+  });
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-4xl px-6 py-10">
@@ -103,6 +126,11 @@ export default async function DashboardPage({
         initialStatus={subscription?.status ?? null}
         currentPeriodEnd={subscription?.current_period_end ?? null}
         isActive={isActive}
+      />
+
+      <InvoicesManager
+        customers={(customers ?? []).map((c) => ({ id: c.id, name: c.name, email: c.email }))}
+        initialInvoices={normalizedInvoices}
       />
 
       <CustomersManager initialCustomers={customers ?? []} />
