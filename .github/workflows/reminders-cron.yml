@@ -1,0 +1,18 @@
+name: Run reminder scheduler
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  run-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reminder runner
+        run: |
+          curl --fail-with-body -X POST "https://invoicewarden.com/api/reminders/run-due" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json"
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
