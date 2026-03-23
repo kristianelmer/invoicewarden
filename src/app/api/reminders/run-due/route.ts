@@ -63,6 +63,13 @@ export async function POST(request: Request) {
         .update({ state: "skipped", skip_reason: "missing_customer_email" })
         .eq("id", reminder.id)
         .eq("state", "scheduled");
+
+      await supabase.from("invoice_events").insert({
+        user_id: reminder.user_id,
+        invoice_id: reminder.invoice_id,
+        event_type: "reminder_skipped",
+        payload: { reminder_id: reminder.id, reason: "missing_customer_email" },
+      });
       continue;
     }
 
@@ -94,14 +101,23 @@ export async function POST(request: Request) {
       sent++;
     } catch (err) {
       failed++;
+      const reason = err instanceof Error ? err.message : "send_failed";
+
       await supabase
         .from("reminders")
         .update({
           state: "failed",
-          failure_reason: err instanceof Error ? err.message : "send_failed",
+          failure_reason: reason,
         })
         .eq("id", reminder.id)
         .eq("state", "scheduled");
+
+      await supabase.from("invoice_events").insert({
+        user_id: reminder.user_id,
+        invoice_id: reminder.invoice_id,
+        event_type: "reminder_failed",
+        payload: { reminder_id: reminder.id, reason },
+      });
     }
   }
 
