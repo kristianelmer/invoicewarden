@@ -2,13 +2,19 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CustomersManager } from "@/components/customers-manager";
 import { BillingControls } from "@/components/billing-controls";
+import { getStripeClient } from "@/lib/stripe";
 
 const ACTIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
+
+function toIsoDate(seconds?: number | null) {
+  if (!seconds) return null;
+  return new Date(seconds * 1000).toISOString();
+}
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ billing?: string }>;
+  searchParams: Promise<{ billing?: string; session_id?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -18,6 +24,40 @@ export default async function DashboardPage({
   if (!user) redirect("/login");
 
   const params = await searchParams;
+
+  if (params.billing === "success" && params.session_id) {
+    try {
+      const stripe = getStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(params.session_id, {
+        expand: ["subscription"],
+      });
+
+      const sub =
+        typeof session.subscription === "object" && session.subscription
+          ? session.subscription
+          : null;
+
+      if (sub?.id) {
+        await supabase.from("billing_subscriptions").upsert(
+          {
+            user_id: user.id,
+            stripe_customer_id:
+              typeof session.customer === "string" ? session.customer : null,
+            stripe_subscription_id: sub.id,
+            status: sub.status,
+            price_id: sub.items.data[0]?.price?.id ?? null,
+            current_period_end: toIsoDate(
+              (sub as { current_period_end?: number }).current_period_end
+            ),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
+      }
+    } catch {
+      // webhook should still handle sync; keep dashboard usable even if this fails
+    }
+  }
 
   const [{ data: customers }, { data: subscription }] = await Promise.all([
     supabase
