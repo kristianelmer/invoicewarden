@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CustomersManager } from "@/components/customers-manager";
 import { BillingControls } from "@/components/billing-controls";
 import { InvoicesManager } from "@/components/invoices-manager";
+import { ActivityLog } from "@/components/activity-log";
 import { getStripeClient } from "@/lib/stripe";
 
 const ACTIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
@@ -60,25 +61,35 @@ export default async function DashboardPage({
     }
   }
 
-  const [{ data: customers }, { data: subscription }, { data: invoices }] =
-    await Promise.all([
-      supabase
-        .from("customers")
-        .select("id,name,email,company,notes,created_at")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("billing_subscriptions")
-        .select("status,current_period_end")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("invoices")
-        .select(
-          "id,invoice_number,currency,amount_cents,issue_date,due_date,status,paid_at,customer:customers(name,email),created_at"
-        )
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: customers },
+    { data: subscription },
+    { data: invoices },
+    { data: events },
+  ] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("id,name,email,company,notes,created_at")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("billing_subscriptions")
+      .select("status,current_period_end")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("invoices")
+      .select(
+        "id,invoice_number,currency,amount_cents,issue_date,due_date,status,paid_at,customer:customers(name,email),created_at"
+      )
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("invoice_events")
+      .select("id,event_type,payload,created_at,invoice:invoices(invoice_number)")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(15),
+  ]);
 
   const isActive = subscription?.status
     ? ACTIVE_STATUSES.has(subscription.status)
@@ -132,6 +143,8 @@ export default async function DashboardPage({
         customers={(customers ?? []).map((c) => ({ id: c.id, name: c.name, email: c.email }))}
         initialInvoices={normalizedInvoices}
       />
+
+      <ActivityLog events={events ?? []} />
 
       <CustomersManager initialCustomers={customers ?? []} />
     </main>
