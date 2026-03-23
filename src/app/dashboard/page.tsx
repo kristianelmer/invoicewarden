@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CustomersManager } from "@/components/customers-manager";
-import { BillingControls } from "@/components/billing-controls";
-import { InvoicesManager } from "@/components/invoices-manager";
-import { ActivityLog } from "@/components/activity-log";
+import { DashboardTabs } from "@/components/dashboard-tabs";
 import { getStripeClient } from "@/lib/stripe";
 
 const ACTIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
@@ -133,20 +130,17 @@ export default async function DashboardPage({
         </div>
       ) : null}
 
-      <BillingControls
-        initialStatus={subscription?.status ?? null}
-        currentPeriodEnd={subscription?.current_period_end ?? null}
-        isActive={isActive}
+      <DashboardTabs
+        customers={customers ?? []}
+        invoices={normalizedInvoices}
+        events={events ?? []}
+        billing={{
+          initialStatus: subscription?.status ?? null,
+          currentPeriodEnd: subscription?.current_period_end ?? null,
+          isActive,
+        }}
+        initialTab={params.billing ? "billing" : "invoices"}
       />
-
-      <InvoicesManager
-        customers={(customers ?? []).map((c) => ({ id: c.id, name: c.name, email: c.email }))}
-        initialInvoices={normalizedInvoices}
-      />
-
-      <ActivityLog events={events ?? []} />
-
-      <CustomersManager initialCustomers={customers ?? []} />
     </main>
   );
 }
