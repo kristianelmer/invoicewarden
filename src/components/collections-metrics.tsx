@@ -6,7 +6,9 @@ type CollectionsMetricsProps = {
   lookbackDays: number;
   sent: number;
   opened: number;
+  openedUnique: number;
   clicked: number;
+  clickedUnique: number;
   paid: number;
 };
 
@@ -21,7 +23,9 @@ export function CollectionsMetrics({
   lookbackDays,
   sent,
   opened,
+  openedUnique,
   clicked,
+  clickedUnique,
   paid,
 }: CollectionsMetricsProps) {
   const router = useRouter();
@@ -67,14 +71,16 @@ export function CollectionsMetrics({
 
         <div className="rounded-lg border p-3">
           <p className="text-xs text-gray-500">Emails opened</p>
-          <p className="text-xl font-semibold">{opened}</p>
-          <p className="text-xs text-gray-500">Open rate: {pct(opened, sent)}</p>
+          <p className="text-xl font-semibold">{openedUnique}</p>
+          <p className="text-xs text-gray-500">Unique / total: {openedUnique} / {opened}</p>
+          <p className="text-xs text-gray-500">Open rate: {pct(openedUnique, sent)}</p>
         </div>
 
         <div className="rounded-lg border p-3">
           <p className="text-xs text-gray-500">Links clicked</p>
-          <p className="text-xl font-semibold">{clicked}</p>
-          <p className="text-xs text-gray-500">Click rate: {pct(clicked, sent)}</p>
+          <p className="text-xl font-semibold">{clickedUnique}</p>
+          <p className="text-xs text-gray-500">Unique / total: {clickedUnique} / {clicked}</p>
+          <p className="text-xs text-gray-500">Click rate: {pct(clickedUnique, sent)}</p>
         </div>
 
         <div className="rounded-lg border p-3">

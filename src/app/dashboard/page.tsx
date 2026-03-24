@@ -84,6 +84,8 @@ export default async function DashboardPage({
     { count: openedCount },
     { count: clickedCount },
     { count: paidCount },
+    { data: openedEvents },
+    { data: clickedEvents },
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -136,11 +138,41 @@ export default async function DashboardPage({
       .eq("user_id", user.id)
       .eq("event_type", "payment_received")
       .gte("created_at", lookbackIso),
+    supabase
+      .from("invoice_events")
+      .select("payload")
+      .eq("user_id", user.id)
+      .eq("event_type", "payment_link_opened")
+      .gte("created_at", lookbackIso),
+    supabase
+      .from("invoice_events")
+      .select("payload")
+      .eq("user_id", user.id)
+      .eq("event_type", "payment_link_clicked")
+      .gte("created_at", lookbackIso),
   ]);
 
   const isActive = subscription?.status
     ? ACTIVE_STATUSES.has(subscription.status)
     : false;
+
+  function uniqueTrackingCount(rows: Array<{ payload: Record<string, unknown> | null }> | null | undefined) {
+    const ids = new Set<string>();
+    for (const row of rows ?? []) {
+      const trackingId = row.payload?.tracking_id;
+      if (typeof trackingId === "string" && trackingId.length > 0) {
+        ids.add(trackingId);
+      }
+    }
+    return ids.size;
+  }
+
+  const openedUniqueCount = uniqueTrackingCount(
+    (openedEvents as Array<{ payload: Record<string, unknown> | null }> | null | undefined) ?? []
+  );
+  const clickedUniqueCount = uniqueTrackingCount(
+    (clickedEvents as Array<{ payload: Record<string, unknown> | null }> | null | undefined) ?? []
+  );
 
   const normalizedInvoices = (invoices ?? []).map((inv) => {
     const customerRaw = inv.customer as unknown;
@@ -221,7 +253,9 @@ export default async function DashboardPage({
           lookbackDays: selectedRangeDays,
           sent: sentCount ?? 0,
           opened: openedCount ?? 0,
+          openedUnique: openedUniqueCount,
           clicked: clickedCount ?? 0,
+          clickedUnique: clickedUniqueCount,
           paid: paidCount ?? 0,
         }}
         initialTab={params.billing || params.connect ? "billing" : "invoices"}

@@ -67,7 +67,9 @@ export function DashboardTabs({
     lookbackDays: number;
     sent: number;
     opened: number;
+    openedUnique: number;
     clicked: number;
+    clickedUnique: number;
     paid: number;
   };
   initialTab?: TabKey;
@@ -112,7 +114,9 @@ export function DashboardTabs({
         lookbackDays={metrics.lookbackDays}
         sent={metrics.sent}
         opened={metrics.opened}
+        openedUnique={metrics.openedUnique}
         clicked={metrics.clicked}
+        clickedUnique={metrics.clickedUnique}
         paid={metrics.paid}
       />
 
