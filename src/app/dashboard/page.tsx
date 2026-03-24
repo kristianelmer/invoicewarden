@@ -13,7 +13,7 @@ function toIsoDate(seconds?: number | null) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ billing?: string; session_id?: string }>;
+  searchParams: Promise<{ billing?: string; session_id?: string; connect?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -63,6 +63,7 @@ export default async function DashboardPage({
     { data: subscription },
     { data: invoices },
     { data: events },
+    { data: profile },
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -86,6 +87,11 @@ export default async function DashboardPage({
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(15),
+    supabase
+      .from("profiles")
+      .select("stripe_connect_account_id,stripe_connect_onboarded")
+      .eq("id", user.id)
+      .maybeSingle(),
   ]);
 
   const isActive = subscription?.status
@@ -130,6 +136,18 @@ export default async function DashboardPage({
         </div>
       ) : null}
 
+      {params.connect === "return" ? (
+        <div className="mb-4 rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800">
+          Stripe Connect onboarding returned successfully. Click &quot;Refresh status&quot; in Billing.
+        </div>
+      ) : null}
+
+      {params.connect === "refresh" ? (
+        <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Stripe requested additional details. Continue onboarding in Billing.
+        </div>
+      ) : null}
+
       <DashboardTabs
         customers={customers ?? []}
         invoices={normalizedInvoices}
@@ -138,8 +156,12 @@ export default async function DashboardPage({
           initialStatus: subscription?.status ?? null,
           currentPeriodEnd: subscription?.current_period_end ?? null,
           isActive,
+          connect: {
+            accountId: profile?.stripe_connect_account_id ?? null,
+            onboarded: Boolean(profile?.stripe_connect_onboarded),
+          },
         }}
-        initialTab={params.billing ? "billing" : "invoices"}
+        initialTab={params.billing || params.connect ? "billing" : "invoices"}
       />
     </main>
   );

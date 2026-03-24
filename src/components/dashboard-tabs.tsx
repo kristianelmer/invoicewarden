@@ -56,6 +56,10 @@ export function DashboardTabs({
     initialStatus: string | null;
     currentPeriodEnd: string | null;
     isActive: boolean;
+    connect: {
+      accountId: string | null;
+      onboarded: boolean;
+    };
   };
   initialTab?: TabKey;
 }) {
@@ -110,6 +114,7 @@ export function DashboardTabs({
           initialStatus={billing.initialStatus}
           currentPeriodEnd={billing.currentPeriodEnd}
           isActive={billing.isActive}
+          connect={billing.connect}
         />
       ) : null}
     </section>
