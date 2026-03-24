@@ -176,27 +176,44 @@ export function buildEnforcementEmail(params: {
 
   const subject = `NOTICE OF STATUTORY INTEREST: Invoice ${params.invoiceNumber} - ${params.freelancerName}`;
 
+  const detailRows: string[] = [];
+
+  if (assessment.statutoryInterestCents > 0 || assessment.dailyInterestCents > 0) {
+    detailRows.push(
+      `Statutory Interest: ${formatMoney(assessment.statutoryInterestCents, params.currency)} (Accruing daily at ${formatMoney(assessment.dailyInterestCents, params.currency)}/day)`
+    );
+  }
+
+  if (assessment.fixedRecoveryFeeCents > 0) {
+    detailRows.push(
+      `Fixed Debt Recovery Fee: ${formatMoney(assessment.fixedRecoveryFeeCents, params.currency)}`
+    );
+  }
+
+  if (assessment.litigationExposureCents > 0) {
+    detailRows.push(
+      `Statutory Damages Exposure: ${formatMoney(assessment.litigationExposureCents, params.currency)}`
+    );
+  }
+
+  if (assessment.administrativeFineCents > 0) {
+    detailRows.push(
+      `Administrative Fine Exposure: ${formatMoney(assessment.administrativeFineCents, params.currency)}`
+    );
+  }
+
+  if (detailRows.length === 0) {
+    detailRows.push(`Current balance exposure: ${formatMoney(assessment.updatedTotalCents, params.currency)}`);
+  }
+
   const lines = [
     `Dear ${params.clientName},`,
     "",
     `Our records indicate that Invoice ${params.invoiceNumber} is now ${assessment.daysLate} days overdue.`,
     `As per the ${assessment.lawLabel}, we have updated your invoice to include:`,
     "",
-    `1. Statutory Interest: ${formatMoney(assessment.statutoryInterestCents, params.currency)} (Accruing daily at ${formatMoney(assessment.dailyInterestCents, params.currency)}/day)`,
-    `2. Fixed Debt Recovery Fee: ${formatMoney(assessment.fixedRecoveryFeeCents, params.currency)}`,
+    ...detailRows.map((row, index) => `${index + 1}. ${row}`),
   ];
-
-  if (assessment.litigationExposureCents > 0) {
-    lines.push(
-      `3. Statutory Damages Exposure: ${formatMoney(assessment.litigationExposureCents, params.currency)}`
-    );
-  }
-
-  if (assessment.administrativeFineCents > 0) {
-    lines.push(
-      `4. Administrative Fine Exposure: ${formatMoney(assessment.administrativeFineCents, params.currency)}`
-    );
-  }
 
   lines.push(
     "",
