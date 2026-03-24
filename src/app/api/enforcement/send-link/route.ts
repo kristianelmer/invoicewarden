@@ -141,7 +141,7 @@ export async function POST(request: Request) {
       subject,
       text,
       html,
-      from: process.env.ENFORCEMENT_FROM ?? "compliance@invoicewarden.app",
+      from: process.env.ENFORCEMENT_FROM ?? "compliance@invoicewarden.com",
     });
 
     await supabase.from("invoice_events").insert({

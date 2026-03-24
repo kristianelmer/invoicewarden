@@ -193,7 +193,7 @@ export async function POST(request: Request) {
       ? {
           subject: enforcement.subject,
           text: enforcement.text,
-          from: process.env.ENFORCEMENT_FROM ?? "compliance@invoicewarden.app",
+          from: process.env.ENFORCEMENT_FROM ?? "compliance@invoicewarden.com",
         }
       : defaultReminder;
 

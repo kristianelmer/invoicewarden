@@ -64,7 +64,7 @@ export default function TermsPage() {
           <p>
             You authorize InvoiceWarden to send reminder and compliance notices to invoice contacts
             using sender identities such as legal-bot@invoicewarden.com or
-            compliance@invoicewarden.app. You are responsible for the underlying invoice validity,
+            compliance@invoicewarden.com. You are responsible for the underlying invoice validity,
             recipient accuracy, and authorization to contact recipients.
           </p>
         </section>
