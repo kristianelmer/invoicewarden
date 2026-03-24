@@ -76,20 +76,27 @@ export async function POST(request: Request) {
   )})`;
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+  const lowDeliverabilityMode = ["1", "true", "yes", "on"].includes(
+    (process.env.LOW_DELIVERABILITY_MODE || "").toLowerCase()
+  );
 
-  const openTrackingToken = buildOpenTrackingToken({
-    invoiceId: invoice.id,
-    userId: user.id,
-  });
+  const openTrackingToken = lowDeliverabilityMode
+    ? null
+    : buildOpenTrackingToken({
+        invoiceId: invoice.id,
+        userId: user.id,
+      });
   const trackingPixelUrl = openTrackingToken
     ? buildOpenTrackingPixelUrl(baseUrl, openTrackingToken)
     : null;
 
-  const clickTrackingToken = buildClickTrackingToken({
-    invoiceId: invoice.id,
-    userId: user.id,
-    targetUrl: invoice.payment_url,
-  });
+  const clickTrackingToken = lowDeliverabilityMode
+    ? null
+    : buildClickTrackingToken({
+        invoiceId: invoice.id,
+        userId: user.id,
+        targetUrl: invoice.payment_url,
+      });
   const trackedPaymentUrl = clickTrackingToken
     ? buildClickTrackingRedirectUrl(baseUrl, clickTrackingToken)
     : invoice.payment_url;
@@ -141,7 +148,7 @@ export async function POST(request: Request) {
       subject,
       text,
       html,
-      from: process.env.ENFORCEMENT_FROM ?? "compliance@invoicewarden.com",
+      from: process.env.ENFORCEMENT_FROM ?? "billing@invoicewarden.com",
     });
 
     await supabase.from("invoice_events").insert({
