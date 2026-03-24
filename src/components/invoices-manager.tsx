@@ -81,9 +81,11 @@ export function InvoicesManager({
 
   const [creatingPaymentFor, setCreatingPaymentFor] = useState<string | null>(null);
   const [creatingCheckoutFor, setCreatingCheckoutFor] = useState<string | null>(null);
+  const [sendingCheckoutFor, setSendingCheckoutFor] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentIntents, setPaymentIntents] = useState<Record<string, PaymentIntentResult>>({});
   const [checkoutLinks, setCheckoutLinks] = useState<Record<string, CheckoutLinkResult>>({});
+  const [sentCheckoutEmails, setSentCheckoutEmails] = useState<Record<string, string>>({});
 
   const totals = useMemo(() => {
     const byCurrency = new Map<string, number>();
@@ -241,6 +243,32 @@ export function InvoicesManager({
     }));
 
     setCreatingCheckoutFor(null);
+  }
+
+  async function sendCheckoutLink(invoiceId: string) {
+    setSendingCheckoutFor(invoiceId);
+    setPaymentError(null);
+
+    const res = await fetch("/api/enforcement/send-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invoice_id: invoiceId }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      setPaymentError(json.error || "Could not send checkout link email");
+      setSendingCheckoutFor(null);
+      return;
+    }
+
+    setSentCheckoutEmails((prev) => ({
+      ...prev,
+      [invoiceId]: json.email_message_id || "sent",
+    }));
+
+    setSendingCheckoutFor(null);
   }
 
   return (
@@ -459,6 +487,11 @@ export function InvoicesManager({
                     ) : inv.payment_url ? (
                       <p className="mt-1 text-xs text-gray-600">Checkout link saved on invoice.</p>
                     ) : null}
+                    {sentCheckoutEmails[inv.id] ? (
+                      <p className="mt-1 text-xs text-green-700">
+                        Checkout email sent ({sentCheckoutEmails[inv.id]}).
+                      </p>
+                    ) : null}
                   </div>
 
                   {inv.status !== "paid" ? (
@@ -471,7 +504,11 @@ export function InvoicesManager({
                       </button>
                       <button
                         onClick={() => createPaymentIntent(inv.id)}
-                        disabled={creatingPaymentFor === inv.id || creatingCheckoutFor === inv.id}
+                        disabled={
+                          creatingPaymentFor === inv.id ||
+                          creatingCheckoutFor === inv.id ||
+                          sendingCheckoutFor === inv.id
+                        }
                         className="rounded border px-3 py-2 text-sm disabled:opacity-50"
                       >
                         {creatingPaymentFor === inv.id
@@ -480,12 +517,28 @@ export function InvoicesManager({
                       </button>
                       <button
                         onClick={() => createCheckoutLink(inv.id)}
-                        disabled={creatingCheckoutFor === inv.id || creatingPaymentFor === inv.id}
+                        disabled={
+                          creatingCheckoutFor === inv.id ||
+                          creatingPaymentFor === inv.id ||
+                          sendingCheckoutFor === inv.id
+                        }
                         className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
                       >
                         {creatingCheckoutFor === inv.id
                           ? "Creating link..."
                           : "Create checkout link"}
+                      </button>
+                      <button
+                        onClick={() => sendCheckoutLink(inv.id)}
+                        disabled={
+                          !(checkoutMeta?.payment_url || inv.payment_url) ||
+                          sendingCheckoutFor === inv.id ||
+                          creatingCheckoutFor === inv.id ||
+                          creatingPaymentFor === inv.id
+                        }
+                        className="rounded border px-3 py-2 text-sm disabled:opacity-50"
+                      >
+                        {sendingCheckoutFor === inv.id ? "Sending email..." : "Send checkout link"}
                       </button>
                       {(checkoutMeta?.payment_url || inv.payment_url) ? (
                         <a
