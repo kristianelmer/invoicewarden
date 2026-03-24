@@ -20,6 +20,7 @@ export default async function DashboardPage({
     connect?: string;
     payment?: string;
     invoice?: string;
+    range?: string;
   }>;
 }) {
   const supabase = await createClient();
@@ -30,8 +31,13 @@ export default async function DashboardPage({
   if (!user) redirect("/login");
 
   const params = await searchParams;
+  const rangeCandidate = Number(params.range);
+  const selectedRangeDays = [7, 30, 90].includes(rangeCandidate)
+    ? rangeCandidate
+    : METRICS_LOOKBACK_DAYS;
+
   const lookbackIso = new Date(
-    Date.now() - METRICS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+    Date.now() - selectedRangeDays * 24 * 60 * 60 * 1000
   ).toISOString();
 
   if (params.billing === "success" && params.session_id) {
@@ -212,7 +218,7 @@ export default async function DashboardPage({
           },
         }}
         metrics={{
-          lookbackDays: METRICS_LOOKBACK_DAYS,
+          lookbackDays: selectedRangeDays,
           sent: sentCount ?? 0,
           opened: openedCount ?? 0,
           clicked: clickedCount ?? 0,
