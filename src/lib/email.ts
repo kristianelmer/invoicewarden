@@ -4,11 +4,13 @@ export async function sendReminderEmail({
   to,
   subject,
   text,
+  html,
   from,
 }: {
   to: string;
   subject: string;
   text: string;
+  html?: string;
   from?: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -25,6 +27,7 @@ export async function sendReminderEmail({
     to,
     subject,
     text,
+    html,
   });
 
   if (error) throw new Error(error.message);

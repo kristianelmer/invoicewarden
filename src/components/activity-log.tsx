@@ -34,6 +34,8 @@ function prettyEventName(type: string) {
       return "Payment received";
     case "payment_link_sent":
       return "Checkout link emailed";
+    case "payment_link_opened":
+      return "Checkout email opened";
     default:
       return type.replaceAll("_", " ");
   }
@@ -53,6 +55,7 @@ function badgeClass(type: string) {
     type === "payment_received" ||
     type === "payment_link_created" ||
     type === "payment_link_sent" ||
+    type === "payment_link_opened" ||
     type === "payment_intent_created"
   ) {
     return "border-green-300 bg-green-50 text-green-700";

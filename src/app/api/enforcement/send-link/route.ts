@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendReminderEmail } from "@/lib/email";
 import { assessLegalExposure, formatMoney } from "@/lib/legal";
+import {
+  buildOpenTrackingPixelUrl,
+  buildOpenTrackingToken,
+} from "@/lib/open-tracking";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -72,7 +76,7 @@ export async function POST(request: Request) {
   const text = [
     `Hi ${customerName},`,
     "",
-    `You can settle invoice ${invoice.invoice_number} using this secure payment link:`, 
+    `You can settle invoice ${invoice.invoice_number} using this secure payment link:`,
     invoice.payment_url,
     "",
     `Updated total due: ${formatMoney(legal.updatedTotalCents, invoice.currency)}`,
@@ -90,10 +94,40 @@ export async function POST(request: Request) {
     .filter(Boolean)
     .join("\n");
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+  const trackingToken = buildOpenTrackingToken({
+    invoiceId: invoice.id,
+    userId: user.id,
+  });
+  const trackingPixelUrl = trackingToken
+    ? buildOpenTrackingPixelUrl(baseUrl, trackingToken)
+    : null;
+
+  const html = [
+    `<p>Hi ${customerName},</p>`,
+    `<p>You can settle invoice <strong>${invoice.invoice_number}</strong> using this secure payment link:</p>`,
+    `<p><a href="${invoice.payment_url}">${invoice.payment_url}</a></p>`,
+    `<p>Updated total due: <strong>${formatMoney(legal.updatedTotalCents, invoice.currency)}</strong></p>`,
+    legal.statutoryInterestCents > 0
+      ? `<p>Statutory interest included: ${formatMoney(legal.statutoryInterestCents, invoice.currency)}</p>`
+      : null,
+    legal.fixedRecoveryFeeCents > 0
+      ? `<p>Recovery fee included: ${formatMoney(legal.fixedRecoveryFeeCents, invoice.currency)}</p>`
+      : null,
+    `<p>If you have already paid, you can ignore this message.</p>`,
+    `<p>InvoiceWarden Compliance</p>`,
+    trackingPixelUrl
+      ? `<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:none;" />`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   const messageId = await sendReminderEmail({
     to: customerEmail,
     subject,
     text,
+    html,
     from: process.env.ENFORCEMENT_FROM ?? "compliance@invoicewarden.app",
   });
 
@@ -106,6 +140,8 @@ export async function POST(request: Request) {
       to: customerEmail,
       payment_url: invoice.payment_url,
       amount_cents: legal.updatedTotalCents,
+      tracking_enabled: Boolean(trackingPixelUrl),
+      tracking_token_id: trackingToken ? trackingToken.split(".")[0]?.slice(0, 12) : null,
     },
   });
 
