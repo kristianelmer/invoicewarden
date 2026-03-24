@@ -22,6 +22,11 @@ type Invoice = {
   amount_cents: number;
   issue_date: string;
   due_date: string;
+  jurisdiction: "UK" | "US_NY" | "US_CA";
+  project_completed_at?: string | null;
+  services_rendered_at?: string | null;
+  contract_requested_refused?: boolean;
+  payment_url?: string | null;
   status: string;
   paid_at?: string | null;
   customer?: { name: string; email: string };

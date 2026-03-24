@@ -45,6 +45,9 @@ export async function POST(request: Request) {
     .update({
       state: "scheduled",
       scheduled_for: new Date().toISOString(),
+      next_retry_at: null,
+      last_attempt_at: null,
+      attempts: 0,
       failure_reason: null,
       skip_reason: null,
     })
@@ -59,7 +62,7 @@ export async function POST(request: Request) {
     user_id: user.id,
     invoice_id: reminder.invoice_id,
     event_type: "reminder_retry_scheduled",
-    payload: { reminder_id: reminder.id },
+    payload: { reminder_id: reminder.id, reason: "manual_retry" },
   });
 
   return NextResponse.json({ ok: true });

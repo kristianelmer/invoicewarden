@@ -18,6 +18,8 @@ function prettyEventName(type: string) {
       return "Invoice marked paid";
     case "reminder_sent":
       return "Reminder sent";
+    case "enforcement_notice_sent":
+      return "Enforcement notice sent";
     case "reminder_failed":
       return "Reminder failed";
     case "reminder_skipped":
@@ -36,7 +38,7 @@ function badgeClass(type: string) {
   if (type === "reminder_skipped") {
     return "border-amber-300 bg-amber-50 text-amber-700";
   }
-  if (type === "reminder_sent" || type === "reminder_retry_scheduled") {
+  if (type === "reminder_sent" || type === "reminder_retry_scheduled" || type === "enforcement_notice_sent") {
     return "border-green-300 bg-green-50 text-green-700";
   }
   return "border-gray-300 bg-gray-50 text-gray-700";

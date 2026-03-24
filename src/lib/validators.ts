@@ -16,6 +16,11 @@ export const invoiceSchema = z.object({
   amount_cents: z.number().int().positive(),
   issue_date: z.string().min(10),
   due_date: z.string().min(10),
+  jurisdiction: z.enum(["UK", "US_NY", "US_CA"]).default("UK"),
+  project_completed_at: z.string().min(10).optional().nullable(),
+  services_rendered_at: z.string().min(10).optional().nullable(),
+  contract_requested_refused: z.boolean().optional().default(false),
+  payment_url: z.string().url().optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
 });
 

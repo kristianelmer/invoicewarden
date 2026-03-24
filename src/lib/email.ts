@@ -4,21 +4,24 @@ export async function sendReminderEmail({
   to,
   subject,
   text,
+  from,
 }: {
   to: string;
   subject: string;
   text: string;
+  from?: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
+  const defaultFrom = process.env.EMAIL_FROM;
+  const sender = from ?? defaultFrom;
 
-  if (!apiKey || !from) {
+  if (!apiKey || !sender) {
     throw new Error("Missing RESEND_API_KEY or EMAIL_FROM");
   }
 
   const resend = new Resend(apiKey);
   const { data, error } = await resend.emails.send({
-    from,
+    from: sender,
     to,
     subject,
     text,

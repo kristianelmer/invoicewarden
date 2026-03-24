@@ -76,7 +76,7 @@ export default async function DashboardPage({
     supabase
       .from("invoices")
       .select(
-        "id,invoice_number,currency,amount_cents,issue_date,due_date,status,paid_at,customer:customers(name,email),created_at"
+        "id,invoice_number,currency,amount_cents,issue_date,due_date,jurisdiction,project_completed_at,services_rendered_at,contract_requested_refused,payment_url,status,paid_at,customer:customers(name,email),created_at"
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),

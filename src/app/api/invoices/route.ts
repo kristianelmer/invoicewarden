@@ -19,7 +19,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("invoices")
     .select(
-      "id,invoice_number,currency,amount_cents,issue_date,due_date,status,paid_at,notes,customer:customers(name,email),created_at"
+      "id,invoice_number,currency,amount_cents,issue_date,due_date,jurisdiction,project_completed_at,services_rendered_at,contract_requested_refused,payment_url,status,paid_at,notes,customer:customers(name,email),created_at"
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     .from("invoices")
     .insert({ ...parsed.data, user_id: user.id, status })
     .select(
-      "id,user_id,invoice_number,currency,amount_cents,issue_date,due_date,status,notes,customer:customers(name,email)"
+      "id,user_id,invoice_number,currency,amount_cents,issue_date,due_date,jurisdiction,project_completed_at,services_rendered_at,contract_requested_refused,payment_url,status,notes,customer:customers(name,email)"
     )
     .single();
 
