@@ -1,17 +1,27 @@
 import { Resend } from "resend";
 
+type EmailAttachment = {
+  filename: string;
+  content: string; // base64
+  contentType?: string;
+};
+
 export async function sendReminderEmail({
   to,
   subject,
   text,
   html,
   from,
+  replyTo,
+  attachments,
 }: {
   to: string;
   subject: string;
   text: string;
   html?: string;
   from?: string;
+  replyTo?: string;
+  attachments?: EmailAttachment[];
 }) {
   const apiKey = process.env.RESEND_API_KEY;
   const defaultFrom = process.env.EMAIL_FROM;
@@ -28,6 +38,8 @@ export async function sendReminderEmail({
     subject,
     text,
     html,
+    replyTo,
+    attachments,
   });
 
   if (error) throw new Error(error.message);

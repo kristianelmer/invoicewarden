@@ -8,6 +8,7 @@ import {
   buildOpenTrackingPixelUrl,
   buildOpenTrackingToken,
 } from "@/lib/open-tracking";
+import { buildCorrectedInvoicePdf } from "@/lib/corrected-invoice-pdf";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
   const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
     .select(
-      "id,user_id,invoice_number,amount_cents,currency,due_date,jurisdiction,project_completed_at,services_rendered_at,contract_requested_refused,payment_url,customer:customers(name,email)"
+      "id,user_id,invoice_number,amount_cents,currency,issue_date,due_date,jurisdiction,project_completed_at,services_rendered_at,contract_requested_refused,payment_url,customer:customers(name,email)"
     )
     .eq("id", invoiceId)
     .eq("user_id", user.id)
@@ -70,10 +71,7 @@ export async function POST(request: Request) {
     now: new Date(),
   });
 
-  const subject = `Payment link: Invoice ${invoice.invoice_number} (${formatMoney(
-    legal.updatedTotalCents,
-    invoice.currency
-  )})`;
+  const subject = `Corrected invoice ${invoice.invoice_number} from InvoiceWarden`;
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
   const lowDeliverabilityMode = ["1", "true", "yes", "on"].includes(
@@ -101,40 +99,47 @@ export async function POST(request: Request) {
     ? buildClickTrackingRedirectUrl(baseUrl, clickTrackingToken)
     : invoice.payment_url;
 
+  const senderName = "InvoiceWarden Billing";
+  const senderEmail = process.env.ENFORCEMENT_FROM ?? "billing@invoicewarden.com";
+  const fromHeader = `${senderName} <${senderEmail}>`;
+  const replyTo = process.env.BILLING_REPLY_TO || senderEmail;
+
+  const pdfBytes = await buildCorrectedInvoicePdf({
+    invoiceNumber: invoice.invoice_number,
+    issueDate: invoice.issue_date,
+    dueDate: invoice.due_date,
+    customerName,
+    customerEmail,
+    jurisdiction: invoice.jurisdiction,
+    originalAmountCents: invoice.amount_cents,
+    currency: invoice.currency,
+    assessment: legal,
+    paymentUrl: invoice.payment_url,
+    senderName,
+    senderEmail,
+  });
+
   const text = [
     `Hi ${customerName},`,
     "",
-    `You can settle invoice ${invoice.invoice_number} using this secure payment link:`,
-    trackedPaymentUrl,
+    `Please find attached your corrected invoice notice for invoice ${invoice.invoice_number}.`,
     "",
     `Updated total due: ${formatMoney(legal.updatedTotalCents, invoice.currency)}`,
-    legal.statutoryInterestCents > 0
-      ? `Statutory interest included: ${formatMoney(legal.statutoryInterestCents, invoice.currency)}`
-      : null,
-    legal.fixedRecoveryFeeCents > 0
-      ? `Recovery fee included: ${formatMoney(legal.fixedRecoveryFeeCents, invoice.currency)}`
-      : null,
+    `Secure payment link: ${trackedPaymentUrl}`,
     "",
-    "If you have already paid, you can ignore this message.",
+    "If payment has already been made, please ignore this message.",
     "",
-    "InvoiceWarden Compliance",
-  ]
-    .filter(Boolean)
-    .join("\n");
+    `${senderName}`,
+    replyTo,
+  ].join("\n");
 
   const html = [
     `<p>Hi ${customerName},</p>`,
-    `<p>You can settle invoice <strong>${invoice.invoice_number}</strong> using this secure payment link:</p>`,
-    `<p><a href="${trackedPaymentUrl}">${invoice.payment_url}</a></p>`,
+    `<p>Please find attached your corrected invoice notice for invoice <strong>${invoice.invoice_number}</strong>.</p>`,
     `<p>Updated total due: <strong>${formatMoney(legal.updatedTotalCents, invoice.currency)}</strong></p>`,
-    legal.statutoryInterestCents > 0
-      ? `<p>Statutory interest included: ${formatMoney(legal.statutoryInterestCents, invoice.currency)}</p>`
-      : null,
-    legal.fixedRecoveryFeeCents > 0
-      ? `<p>Recovery fee included: ${formatMoney(legal.fixedRecoveryFeeCents, invoice.currency)}</p>`
-      : null,
-    `<p>If you have already paid, you can ignore this message.</p>`,
-    `<p>InvoiceWarden Compliance</p>`,
+    `<p>Secure payment link: <a href="${trackedPaymentUrl}">${invoice.payment_url}</a></p>`,
+    `<p>If payment has already been made, please ignore this message.</p>`,
+    `<p>${senderName}<br/>${replyTo}</p>`,
     trackingPixelUrl
       ? `<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:none;" />`
       : null,
@@ -148,7 +153,15 @@ export async function POST(request: Request) {
       subject,
       text,
       html,
-      from: process.env.ENFORCEMENT_FROM ?? "billing@invoicewarden.com",
+      from: fromHeader,
+      replyTo,
+      attachments: [
+        {
+          filename: `corrected-invoice-${invoice.invoice_number}.pdf`,
+          content: Buffer.from(pdfBytes).toString("base64"),
+          contentType: "application/pdf",
+        },
+      ],
     });
 
     await supabase.from("invoice_events").insert({
@@ -160,6 +173,9 @@ export async function POST(request: Request) {
         to: customerEmail,
         payment_url: invoice.payment_url,
         amount_cents: legal.updatedTotalCents,
+        sender: fromHeader,
+        reply_to: replyTo,
+        attachment_filename: `corrected-invoice-${invoice.invoice_number}.pdf`,
         tracking_enabled: Boolean(trackingPixelUrl),
         open_tracking_token_id: openTrackingToken
           ? openTrackingToken.split(".")[0]?.slice(0, 12)
