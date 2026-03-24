@@ -1,9 +1,13 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
-type OpenTrackingPayload = {
+export type TrackingKind = "open" | "click";
+
+type TrackingPayload = {
+  kind: TrackingKind;
   invoiceId: string;
   userId: string;
   trackingId: string;
+  targetUrl?: string;
   iat: number;
   exp: number;
 };
@@ -26,21 +30,23 @@ function sign(payloadSegment: string, secret: string) {
   return createHmac("sha256", secret).update(payloadSegment).digest("base64url");
 }
 
-export function buildOpenTrackingToken(params: {
+function buildTrackingToken(params: {
+  kind: TrackingKind;
   invoiceId: string;
   userId: string;
+  targetUrl?: string;
   ttlSeconds?: number;
 }) {
   const secret = getSecret();
-  if (!secret) {
-    return null;
-  }
+  if (!secret) return null;
 
   const now = Math.floor(Date.now() / 1000);
-  const payload: OpenTrackingPayload = {
+  const payload: TrackingPayload = {
+    kind: params.kind,
     invoiceId: params.invoiceId,
     userId: params.userId,
     trackingId: randomUUID(),
+    targetUrl: params.targetUrl,
     iat: now,
     exp: now + (params.ttlSeconds ?? DEFAULT_TTL_SECONDS),
   };
@@ -48,6 +54,34 @@ export function buildOpenTrackingToken(params: {
   const payloadSegment = base64UrlEncode(JSON.stringify(payload));
   const signature = sign(payloadSegment, secret);
   return `${payloadSegment}.${signature}`;
+}
+
+export function buildOpenTrackingToken(params: {
+  invoiceId: string;
+  userId: string;
+  ttlSeconds?: number;
+}) {
+  return buildTrackingToken({
+    kind: "open",
+    invoiceId: params.invoiceId,
+    userId: params.userId,
+    ttlSeconds: params.ttlSeconds,
+  });
+}
+
+export function buildClickTrackingToken(params: {
+  invoiceId: string;
+  userId: string;
+  targetUrl: string;
+  ttlSeconds?: number;
+}) {
+  return buildTrackingToken({
+    kind: "click",
+    invoiceId: params.invoiceId,
+    userId: params.userId,
+    targetUrl: params.targetUrl,
+    ttlSeconds: params.ttlSeconds,
+  });
 }
 
 export function verifyOpenTrackingToken(token: string) {
@@ -66,9 +100,12 @@ export function verifyOpenTrackingToken(token: string) {
 
   try {
     const raw = base64UrlDecode(payloadSegment);
-    const payload = JSON.parse(raw) as OpenTrackingPayload;
+    const payload = JSON.parse(raw) as TrackingPayload;
 
-    if (!payload.invoiceId || !payload.userId || !payload.trackingId) return null;
+    if (!payload.kind || !payload.invoiceId || !payload.userId || !payload.trackingId) {
+      return null;
+    }
+
     if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
 
     return payload;
@@ -80,4 +117,9 @@ export function verifyOpenTrackingToken(token: string) {
 export function buildOpenTrackingPixelUrl(baseUrl: string, token: string) {
   const encoded = encodeURIComponent(token);
   return `${baseUrl}/api/enforcement/open?token=${encoded}`;
+}
+
+export function buildClickTrackingRedirectUrl(baseUrl: string, token: string) {
+  const encoded = encodeURIComponent(token);
+  return `${baseUrl}/api/enforcement/click?token=${encoded}`;
 }

@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   if (token) {
     const payload = verifyOpenTrackingToken(token);
 
-    if (payload) {
+    if (payload && payload.kind === "open") {
       const supabase = createAdminClient();
       const userAgent = request.headers.get("user-agent") || null;
       const forwardedFor = request.headers.get("x-forwarded-for") || null;

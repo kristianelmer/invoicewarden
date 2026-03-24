@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { sendReminderEmail } from "@/lib/email";
 import { assessLegalExposure, formatMoney } from "@/lib/legal";
 import {
+  buildClickTrackingRedirectUrl,
+  buildClickTrackingToken,
   buildOpenTrackingPixelUrl,
   buildOpenTrackingToken,
 } from "@/lib/open-tracking";
@@ -73,11 +75,30 @@ export async function POST(request: Request) {
     invoice.currency
   )})`;
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+
+  const openTrackingToken = buildOpenTrackingToken({
+    invoiceId: invoice.id,
+    userId: user.id,
+  });
+  const trackingPixelUrl = openTrackingToken
+    ? buildOpenTrackingPixelUrl(baseUrl, openTrackingToken)
+    : null;
+
+  const clickTrackingToken = buildClickTrackingToken({
+    invoiceId: invoice.id,
+    userId: user.id,
+    targetUrl: invoice.payment_url,
+  });
+  const trackedPaymentUrl = clickTrackingToken
+    ? buildClickTrackingRedirectUrl(baseUrl, clickTrackingToken)
+    : invoice.payment_url;
+
   const text = [
     `Hi ${customerName},`,
     "",
     `You can settle invoice ${invoice.invoice_number} using this secure payment link:`,
-    invoice.payment_url,
+    trackedPaymentUrl,
     "",
     `Updated total due: ${formatMoney(legal.updatedTotalCents, invoice.currency)}`,
     legal.statutoryInterestCents > 0
@@ -94,19 +115,10 @@ export async function POST(request: Request) {
     .filter(Boolean)
     .join("\n");
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-  const trackingToken = buildOpenTrackingToken({
-    invoiceId: invoice.id,
-    userId: user.id,
-  });
-  const trackingPixelUrl = trackingToken
-    ? buildOpenTrackingPixelUrl(baseUrl, trackingToken)
-    : null;
-
   const html = [
     `<p>Hi ${customerName},</p>`,
     `<p>You can settle invoice <strong>${invoice.invoice_number}</strong> using this secure payment link:</p>`,
-    `<p><a href="${invoice.payment_url}">${invoice.payment_url}</a></p>`,
+    `<p><a href="${trackedPaymentUrl}">${invoice.payment_url}</a></p>`,
     `<p>Updated total due: <strong>${formatMoney(legal.updatedTotalCents, invoice.currency)}</strong></p>`,
     legal.statutoryInterestCents > 0
       ? `<p>Statutory interest included: ${formatMoney(legal.statutoryInterestCents, invoice.currency)}</p>`
@@ -141,7 +153,13 @@ export async function POST(request: Request) {
       payment_url: invoice.payment_url,
       amount_cents: legal.updatedTotalCents,
       tracking_enabled: Boolean(trackingPixelUrl),
-      tracking_token_id: trackingToken ? trackingToken.split(".")[0]?.slice(0, 12) : null,
+      open_tracking_token_id: openTrackingToken
+        ? openTrackingToken.split(".")[0]?.slice(0, 12)
+        : null,
+      click_tracking_enabled: Boolean(clickTrackingToken),
+      click_tracking_token_id: clickTrackingToken
+        ? clickTrackingToken.split(".")[0]?.slice(0, 12)
+        : null,
     },
   });
 
