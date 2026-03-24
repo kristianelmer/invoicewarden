@@ -147,6 +147,20 @@ async function handlePaymentIntentSucceeded(event: Stripe.PaymentIntentSucceeded
   });
 }
 
+async function handleInvoicePaid(event: Stripe.InvoicePaidEvent) {
+  const invoice = event.data.object;
+  const invoiceId = invoice.metadata?.invoiceId ?? null;
+  const userId = invoice.metadata?.userId ?? null;
+
+  await markInvoicePaidFromMetadata({
+    invoiceId,
+    userId,
+    paymentIntentId: null,
+    amountReceivedCents: invoice.amount_paid ?? null,
+    currency: invoice.currency ?? null,
+  });
+}
+
 export async function POST(request: Request) {
   const stripe = getStripeClient();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -184,6 +198,10 @@ export async function POST(request: Request) {
 
   if (event.type === "payment_intent.succeeded") {
     await handlePaymentIntentSucceeded(event as Stripe.PaymentIntentSucceededEvent);
+  }
+
+  if (event.type === "invoice.paid") {
+    await handleInvoicePaid(event as Stripe.InvoicePaidEvent);
   }
 
   return NextResponse.json({ received: true });

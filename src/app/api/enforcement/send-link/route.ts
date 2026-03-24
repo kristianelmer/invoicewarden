@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { sendReminderEmail } from "@/lib/email";
 import { assessLegalExposure, formatMoney } from "@/lib/legal";
-import {
-  buildClickTrackingRedirectUrl,
-  buildClickTrackingToken,
-  buildOpenTrackingPixelUrl,
-  buildOpenTrackingToken,
-} from "@/lib/open-tracking";
-import { buildCorrectedInvoicePdf } from "@/lib/corrected-invoice-pdf";
+import { getStripeClient } from "@/lib/stripe";
+
+const SUCCESS_FEE_BPS = 2000; // 20%
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -53,13 +48,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing customer email" }, { status: 400 });
   }
 
-  if (!invoice.payment_url) {
-    return NextResponse.json(
-      { error: "No checkout link found. Create checkout link first." },
-      { status: 400 }
-    );
-  }
-
   const legal = assessLegalExposure({
     amountCents: invoice.amount_cents,
     currency: invoice.currency,
@@ -71,125 +59,135 @@ export async function POST(request: Request) {
     now: new Date(),
   });
 
-  const subject = `Corrected invoice ${invoice.invoice_number} from InvoiceWarden`;
+  const totalAmount = legal.updatedTotalCents;
+  const legalAddons = Math.max(0, legal.updatedTotalCents - invoice.amount_cents);
+  const applicationFeeAmount = Math.round((legalAddons * SUCCESS_FEE_BPS) / 10_000);
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-  const lowDeliverabilityMode = ["1", "true", "yes", "on"].includes(
-    (process.env.LOW_DELIVERABILITY_MODE || "").toLowerCase()
-  );
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("stripe_connect_account_id")
+    .eq("id", user.id)
+    .maybeSingle();
 
-  const openTrackingToken = lowDeliverabilityMode
-    ? null
-    : buildOpenTrackingToken({
-        invoiceId: invoice.id,
-        userId: user.id,
-      });
-  const trackingPixelUrl = openTrackingToken
-    ? buildOpenTrackingPixelUrl(baseUrl, openTrackingToken)
-    : null;
+  if (profileError) {
+    return NextResponse.json({ error: profileError.message }, { status: 400 });
+  }
 
-  const clickTrackingToken = lowDeliverabilityMode
-    ? null
-    : buildClickTrackingToken({
-        invoiceId: invoice.id,
-        userId: user.id,
-        targetUrl: invoice.payment_url,
-      });
-  const trackedPaymentUrl = clickTrackingToken
-    ? buildClickTrackingRedirectUrl(baseUrl, clickTrackingToken)
-    : invoice.payment_url;
-
-  const senderName = "InvoiceWarden Billing";
-  const senderEmail = process.env.ENFORCEMENT_FROM ?? "billing@invoicewarden.com";
-  const fromHeader = `${senderName} <${senderEmail}>`;
-  const replyTo = process.env.BILLING_REPLY_TO || senderEmail;
-
-  const pdfBytes = await buildCorrectedInvoicePdf({
-    invoiceNumber: invoice.invoice_number,
-    issueDate: invoice.issue_date,
-    dueDate: invoice.due_date,
-    customerName,
-    customerEmail,
-    jurisdiction: invoice.jurisdiction,
-    originalAmountCents: invoice.amount_cents,
-    currency: invoice.currency,
-    assessment: legal,
-    paymentUrl: invoice.payment_url,
-    senderName,
-    senderEmail,
-  });
-
-  const text = [
-    `Hi ${customerName},`,
-    "",
-    `Please find attached your corrected invoice notice for invoice ${invoice.invoice_number}.`,
-    "",
-    `Updated total due: ${formatMoney(legal.updatedTotalCents, invoice.currency)}`,
-    `Secure payment link: ${trackedPaymentUrl}`,
-    "",
-    "If payment has already been made, please ignore this message.",
-    "",
-    `${senderName}`,
-    replyTo,
-  ].join("\n");
-
-  const html = [
-    `<p>Hi ${customerName},</p>`,
-    `<p>Please find attached your corrected invoice notice for invoice <strong>${invoice.invoice_number}</strong>.</p>`,
-    `<p>Updated total due: <strong>${formatMoney(legal.updatedTotalCents, invoice.currency)}</strong></p>`,
-    `<p>Secure payment link: <a href="${trackedPaymentUrl}">${invoice.payment_url}</a></p>`,
-    `<p>If payment has already been made, please ignore this message.</p>`,
-    `<p>${senderName}<br/>${replyTo}</p>`,
-    trackingPixelUrl
-      ? `<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:none;" />`
-      : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const stripe = getStripeClient();
 
   try {
-    const messageId = await sendReminderEmail({
-      to: customerEmail,
-      subject,
-      text,
-      html,
-      from: fromHeader,
-      replyTo,
-      attachments: [
-        {
-          filename: `corrected-invoice-${invoice.invoice_number}.pdf`,
-          content: Buffer.from(pdfBytes).toString("base64"),
-          contentType: "application/pdf",
-        },
-      ],
+    const stripeCustomer = await stripe.customers.create({
+      email: customerEmail,
+      name: customerName,
+      metadata: {
+        userId: user.id,
+        localInvoiceId: invoice.id,
+      },
     });
+
+    const stripeInvoice = await stripe.invoices.create({
+      customer: stripeCustomer.id,
+      collection_method: "send_invoice",
+      days_until_due: 14,
+      auto_advance: false,
+      currency: invoice.currency.toLowerCase(),
+      metadata: {
+        userId: user.id,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoice_number,
+        jurisdiction: invoice.jurisdiction,
+      },
+      description: `Corrected invoice ${invoice.invoice_number}`,
+      ...(profile?.stripe_connect_account_id
+        ? {
+            transfer_data: { destination: profile.stripe_connect_account_id },
+            application_fee_amount: Math.min(totalAmount, applicationFeeAmount),
+          }
+        : {}),
+    });
+
+    const lineItems: Array<{ amount: number; description: string }> = [
+      {
+        amount: invoice.amount_cents,
+        description: `Original invoice amount (${invoice.invoice_number})`,
+      },
+    ];
+
+    if (legal.statutoryInterestCents > 0) {
+      lineItems.push({
+        amount: legal.statutoryInterestCents,
+        description: "Statutory interest",
+      });
+    }
+
+    if (legal.fixedRecoveryFeeCents > 0) {
+      lineItems.push({
+        amount: legal.fixedRecoveryFeeCents,
+        description: "Fixed debt recovery fee",
+      });
+    }
+
+    if (legal.litigationExposureCents > 0) {
+      lineItems.push({
+        amount: legal.litigationExposureCents,
+        description: "Statutory damages component",
+      });
+    }
+
+    if (legal.administrativeFineCents > 0) {
+      lineItems.push({
+        amount: legal.administrativeFineCents,
+        description: "Administrative fine component",
+      });
+    }
+
+    for (const item of lineItems) {
+      await stripe.invoiceItems.create({
+        customer: stripeCustomer.id,
+        invoice: stripeInvoice.id,
+        currency: invoice.currency.toLowerCase(),
+        amount: item.amount,
+        description: item.description,
+      });
+    }
+
+    const finalized = await stripe.invoices.finalizeInvoice(stripeInvoice.id, {
+      auto_advance: true,
+    });
+
+    await stripe.invoices.sendInvoice(finalized.id);
+
+    await supabase
+      .from("invoices")
+      .update({ payment_url: finalized.hosted_invoice_url })
+      .eq("id", invoice.id)
+      .eq("user_id", user.id);
 
     await supabase.from("invoice_events").insert({
       user_id: user.id,
       invoice_id: invoice.id,
       event_type: "payment_link_sent",
       payload: {
-        email_message_id: messageId,
-        to: customerEmail,
-        payment_url: invoice.payment_url,
+        method: "stripe_invoice",
+        stripe_invoice_id: finalized.id,
+        stripe_customer_id: stripeCustomer.id,
+        hosted_invoice_url: finalized.hosted_invoice_url,
+        invoice_pdf: finalized.invoice_pdf,
         amount_cents: legal.updatedTotalCents,
-        sender: fromHeader,
-        reply_to: replyTo,
-        attachment_filename: `corrected-invoice-${invoice.invoice_number}.pdf`,
-        tracking_enabled: Boolean(trackingPixelUrl),
-        open_tracking_token_id: openTrackingToken
-          ? openTrackingToken.split(".")[0]?.slice(0, 12)
-          : null,
-        click_tracking_enabled: Boolean(clickTrackingToken),
-        click_tracking_token_id: clickTrackingToken
-          ? clickTrackingToken.split(".")[0]?.slice(0, 12)
-          : null,
+        legal_addons_cents: legalAddons,
       },
     });
 
-    return NextResponse.json({ ok: true, email_message_id: messageId });
+    return NextResponse.json({
+      ok: true,
+      email_message_id: finalized.id,
+      payment_url: finalized.hosted_invoice_url,
+      invoice_pdf: finalized.invoice_pdf,
+      amount_cents: legal.updatedTotalCents,
+      note: `Stripe invoice sent for ${formatMoney(legal.updatedTotalCents, invoice.currency)}`,
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not send checkout link email";
+    const message = error instanceof Error ? error.message : "Could not send Stripe invoice";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
