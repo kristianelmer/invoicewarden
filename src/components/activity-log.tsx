@@ -30,6 +30,8 @@ function prettyEventName(type: string) {
       return "Payment intent created";
     case "payment_link_created":
       return "Checkout link created";
+    case "payment_received":
+      return "Payment received";
     default:
       return type.replaceAll("_", " ");
   }
@@ -42,7 +44,14 @@ function badgeClass(type: string) {
   if (type === "reminder_skipped") {
     return "border-amber-300 bg-amber-50 text-amber-700";
   }
-  if (type === "reminder_sent" || type === "reminder_retry_scheduled" || type === "enforcement_notice_sent") {
+  if (
+    type === "reminder_sent" ||
+    type === "reminder_retry_scheduled" ||
+    type === "enforcement_notice_sent" ||
+    type === "payment_received" ||
+    type === "payment_link_created" ||
+    type === "payment_intent_created"
+  ) {
     return "border-green-300 bg-green-50 text-green-700";
   }
   return "border-gray-300 bg-gray-50 text-gray-700";

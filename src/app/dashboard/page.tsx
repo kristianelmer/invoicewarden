@@ -13,7 +13,13 @@ function toIsoDate(seconds?: number | null) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ billing?: string; session_id?: string; connect?: string }>;
+  searchParams: Promise<{
+    billing?: string;
+    session_id?: string;
+    connect?: string;
+    payment?: string;
+    invoice?: string;
+  }>;
 }) {
   const supabase = await createClient();
   const {
@@ -145,6 +151,18 @@ export default async function DashboardPage({
       {params.connect === "refresh" ? (
         <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           Stripe requested additional details. Continue onboarding in Billing.
+        </div>
+      ) : null}
+
+      {params.payment === "success" ? (
+        <div className="mb-4 rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800">
+          Payment completed. Invoice was marked as paid automatically.
+        </div>
+      ) : null}
+
+      {params.payment === "cancelled" ? (
+        <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Payment checkout was canceled.
         </div>
       ) : null}
 
