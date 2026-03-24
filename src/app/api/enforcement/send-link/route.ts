@@ -135,33 +135,38 @@ export async function POST(request: Request) {
     .filter(Boolean)
     .join("\n");
 
-  const messageId = await sendReminderEmail({
-    to: customerEmail,
-    subject,
-    text,
-    html,
-    from: process.env.ENFORCEMENT_FROM ?? "compliance@invoicewarden.app",
-  });
-
-  await supabase.from("invoice_events").insert({
-    user_id: user.id,
-    invoice_id: invoice.id,
-    event_type: "payment_link_sent",
-    payload: {
-      email_message_id: messageId,
+  try {
+    const messageId = await sendReminderEmail({
       to: customerEmail,
-      payment_url: invoice.payment_url,
-      amount_cents: legal.updatedTotalCents,
-      tracking_enabled: Boolean(trackingPixelUrl),
-      open_tracking_token_id: openTrackingToken
-        ? openTrackingToken.split(".")[0]?.slice(0, 12)
-        : null,
-      click_tracking_enabled: Boolean(clickTrackingToken),
-      click_tracking_token_id: clickTrackingToken
-        ? clickTrackingToken.split(".")[0]?.slice(0, 12)
-        : null,
-    },
-  });
+      subject,
+      text,
+      html,
+      from: process.env.ENFORCEMENT_FROM ?? "compliance@invoicewarden.app",
+    });
 
-  return NextResponse.json({ ok: true, email_message_id: messageId });
+    await supabase.from("invoice_events").insert({
+      user_id: user.id,
+      invoice_id: invoice.id,
+      event_type: "payment_link_sent",
+      payload: {
+        email_message_id: messageId,
+        to: customerEmail,
+        payment_url: invoice.payment_url,
+        amount_cents: legal.updatedTotalCents,
+        tracking_enabled: Boolean(trackingPixelUrl),
+        open_tracking_token_id: openTrackingToken
+          ? openTrackingToken.split(".")[0]?.slice(0, 12)
+          : null,
+        click_tracking_enabled: Boolean(clickTrackingToken),
+        click_tracking_token_id: clickTrackingToken
+          ? clickTrackingToken.split(".")[0]?.slice(0, 12)
+          : null,
+      },
+    });
+
+    return NextResponse.json({ ok: true, email_message_id: messageId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not send checkout link email";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }
