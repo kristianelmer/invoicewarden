@@ -5,6 +5,7 @@ import { BillingControls } from "@/components/billing-controls";
 import { InvoicesManager } from "@/components/invoices-manager";
 import { ActivityLog } from "@/components/activity-log";
 import { CustomersManager } from "@/components/customers-manager";
+import { CollectionsMetrics } from "@/components/collections-metrics";
 
 type Customer = {
   id: string;
@@ -47,6 +48,7 @@ export function DashboardTabs({
   invoices,
   events,
   billing,
+  metrics,
   initialTab,
 }: {
   customers: Customer[];
@@ -60,6 +62,13 @@ export function DashboardTabs({
       accountId: string | null;
       onboarded: boolean;
     };
+  };
+  metrics: {
+    lookbackDays: number;
+    sent: number;
+    opened: number;
+    clicked: number;
+    paid: number;
   };
   initialTab?: TabKey;
 }) {
@@ -98,6 +107,14 @@ export function DashboardTabs({
           );
         })}
       </div>
+
+      <CollectionsMetrics
+        lookbackDays={metrics.lookbackDays}
+        sent={metrics.sent}
+        opened={metrics.opened}
+        clicked={metrics.clicked}
+        paid={metrics.paid}
+      />
 
       {activeTab === "invoices" ? (
         <InvoicesManager customers={customerLite} initialInvoices={invoices} />

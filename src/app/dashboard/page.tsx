@@ -4,6 +4,7 @@ import { DashboardTabs } from "@/components/dashboard-tabs";
 import { getStripeClient } from "@/lib/stripe";
 
 const ACTIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
+const METRICS_LOOKBACK_DAYS = 30;
 
 function toIsoDate(seconds?: number | null) {
   if (!seconds) return null;
@@ -29,6 +30,9 @@ export default async function DashboardPage({
   if (!user) redirect("/login");
 
   const params = await searchParams;
+  const lookbackIso = new Date(
+    Date.now() - METRICS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
 
   if (params.billing === "success" && params.session_id) {
     try {
@@ -70,6 +74,10 @@ export default async function DashboardPage({
     { data: invoices },
     { data: events },
     { data: profile },
+    { count: sentCount },
+    { count: openedCount },
+    { count: clickedCount },
+    { count: paidCount },
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -98,6 +106,30 @@ export default async function DashboardPage({
       .select("stripe_connect_account_id,stripe_connect_onboarded")
       .eq("id", user.id)
       .maybeSingle(),
+    supabase
+      .from("invoice_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("event_type", "payment_link_sent")
+      .gte("created_at", lookbackIso),
+    supabase
+      .from("invoice_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("event_type", "payment_link_opened")
+      .gte("created_at", lookbackIso),
+    supabase
+      .from("invoice_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("event_type", "payment_link_clicked")
+      .gte("created_at", lookbackIso),
+    supabase
+      .from("invoice_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("event_type", "payment_received")
+      .gte("created_at", lookbackIso),
   ]);
 
   const isActive = subscription?.status
@@ -178,6 +210,13 @@ export default async function DashboardPage({
             accountId: profile?.stripe_connect_account_id ?? null,
             onboarded: Boolean(profile?.stripe_connect_onboarded),
           },
+        }}
+        metrics={{
+          lookbackDays: METRICS_LOOKBACK_DAYS,
+          sent: sentCount ?? 0,
+          opened: openedCount ?? 0,
+          clicked: clickedCount ?? 0,
+          paid: paidCount ?? 0,
         }}
         initialTab={params.billing || params.connect ? "billing" : "invoices"}
       />
