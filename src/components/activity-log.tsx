@@ -26,6 +26,10 @@ function prettyEventName(type: string) {
       return "Reminder skipped";
     case "reminder_retry_scheduled":
       return "Reminder retry scheduled";
+    case "payment_intent_created":
+      return "Payment intent created";
+    case "payment_link_created":
+      return "Checkout link created";
     default:
       return type.replaceAll("_", " ");
   }

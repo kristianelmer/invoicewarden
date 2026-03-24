@@ -32,6 +32,13 @@ type PaymentIntentResult = {
   application_fee_amount: number;
 };
 
+type CheckoutLinkResult = {
+  checkout_session_id: string;
+  payment_url: string;
+  amount_cents: number;
+  application_fee_amount: number;
+};
+
 function jurisdictionLabel(jurisdiction: Invoice["jurisdiction"]) {
   switch (jurisdiction) {
     case "UK":
@@ -73,8 +80,10 @@ export function InvoicesManager({
   const [paymentUrl, setPaymentUrl] = useState("");
 
   const [creatingPaymentFor, setCreatingPaymentFor] = useState<string | null>(null);
+  const [creatingCheckoutFor, setCreatingCheckoutFor] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentIntents, setPaymentIntents] = useState<Record<string, PaymentIntentResult>>({});
+  const [checkoutLinks, setCheckoutLinks] = useState<Record<string, CheckoutLinkResult>>({});
 
   const totals = useMemo(() => {
     const byCurrency = new Map<string, number>();
@@ -201,6 +210,37 @@ export function InvoicesManager({
     }));
 
     setCreatingPaymentFor(null);
+  }
+
+  async function createCheckoutLink(invoiceId: string) {
+    setCreatingCheckoutFor(invoiceId);
+    setPaymentError(null);
+
+    const res = await fetch("/api/enforcement/checkout-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invoice_id: invoiceId }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      setPaymentError(json.error || "Could not create checkout link");
+      setCreatingCheckoutFor(null);
+      return;
+    }
+
+    setCheckoutLinks((prev) => ({
+      ...prev,
+      [invoiceId]: {
+        checkout_session_id: json.checkout_session_id,
+        payment_url: json.payment_url,
+        amount_cents: json.amount_cents,
+        application_fee_amount: json.application_fee_amount,
+      },
+    }));
+
+    setCreatingCheckoutFor(null);
   }
 
   return (
@@ -395,6 +435,7 @@ export function InvoicesManager({
           <ul className="mt-3 divide-y">
             {invoices.map((inv) => {
               const paymentMeta = paymentIntents[inv.id];
+              const checkoutMeta = checkoutLinks[inv.id];
               return (
                 <li key={inv.id} className="flex items-center justify-between gap-4 py-3">
                   <div>
@@ -411,6 +452,13 @@ export function InvoicesManager({
                         PaymentIntent: {paymentMeta.payment_intent_id} · Total {formatMoney(paymentMeta.amount_cents, inv.currency)} · Fee {formatMoney(paymentMeta.application_fee_amount, inv.currency)}
                       </p>
                     ) : null}
+                    {checkoutMeta ? (
+                      <p className="mt-1 text-xs text-green-700">
+                        Checkout link ready · Total {formatMoney(checkoutMeta.amount_cents, inv.currency)} · Fee {formatMoney(checkoutMeta.application_fee_amount, inv.currency)}
+                      </p>
+                    ) : inv.payment_url ? (
+                      <p className="mt-1 text-xs text-gray-600">Checkout link saved on invoice.</p>
+                    ) : null}
                   </div>
 
                   {inv.status !== "paid" ? (
@@ -423,13 +471,32 @@ export function InvoicesManager({
                       </button>
                       <button
                         onClick={() => createPaymentIntent(inv.id)}
-                        disabled={creatingPaymentFor === inv.id}
+                        disabled={creatingPaymentFor === inv.id || creatingCheckoutFor === inv.id}
                         className="rounded border px-3 py-2 text-sm disabled:opacity-50"
                       >
                         {creatingPaymentFor === inv.id
                           ? "Creating payment..."
                           : "Create payment intent"}
                       </button>
+                      <button
+                        onClick={() => createCheckoutLink(inv.id)}
+                        disabled={creatingCheckoutFor === inv.id || creatingPaymentFor === inv.id}
+                        className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
+                      >
+                        {creatingCheckoutFor === inv.id
+                          ? "Creating link..."
+                          : "Create checkout link"}
+                      </button>
+                      {(checkoutMeta?.payment_url || inv.payment_url) ? (
+                        <a
+                          href={checkoutMeta?.payment_url || inv.payment_url || "#"}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded border px-3 py-2 text-center text-xs"
+                        >
+                          Open checkout link
+                        </a>
+                      ) : null}
                     </div>
                   ) : (
                     <span className="text-sm text-green-700">Paid</span>
