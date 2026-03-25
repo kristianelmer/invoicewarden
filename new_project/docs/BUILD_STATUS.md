@@ -3,6 +3,7 @@
 Last updated: 2026-03-25
 
 ## Completed
+- IW-9003/9004 (baseline): Invoice payment-session API added with Stripe Checkout + 20% fee on additional recovery only.
 - IW-9002 (baseline): Stripe Connect onboarding + status API routes added.
 - IW-9001 (baseline): Professional invoice PDF service + invoice PDF API route (`/api/invoices/[id]/pdf`) added.
 - IW-2001: New project Next.js shell created with core routes and navigation.
