@@ -3,6 +3,7 @@
 Last updated: 2026-03-25
 
 ## Completed
+- IW-9001 (baseline): Professional invoice PDF service + invoice PDF API route (`/api/invoices/[id]/pdf`) added.
 - IW-2001: New project Next.js shell created with core routes and navigation.
 - IW-2002 (baseline): Supabase auth path added (login page, dashboard route protection, signout endpoint, middleware session refresh).
 - IW-3001: Customers API now persisted via Supabase (`customers` table contract) with validation + duplicate email conflict handling.
