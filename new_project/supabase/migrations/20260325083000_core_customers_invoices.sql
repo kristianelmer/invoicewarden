@@ -34,37 +34,47 @@ create unique index if not exists invoices_user_invoice_number_unique
 alter table public.customers enable row level security;
 alter table public.invoices enable row level security;
 
-create policy if not exists "customers_select_own"
+-- PostgreSQL doesn't support CREATE POLICY IF NOT EXISTS on many versions;
+-- use explicit drop/create to keep migration idempotent.
+drop policy if exists "customers_select_own" on public.customers;
+create policy "customers_select_own"
   on public.customers for select
   using (auth.uid() = user_id);
 
-create policy if not exists "customers_insert_own"
+drop policy if exists "customers_insert_own" on public.customers;
+create policy "customers_insert_own"
   on public.customers for insert
   with check (auth.uid() = user_id);
 
-create policy if not exists "customers_update_own"
+drop policy if exists "customers_update_own" on public.customers;
+create policy "customers_update_own"
   on public.customers for update
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy if not exists "customers_delete_own"
+drop policy if exists "customers_delete_own" on public.customers;
+create policy "customers_delete_own"
   on public.customers for delete
   using (auth.uid() = user_id);
 
-create policy if not exists "invoices_select_own"
+drop policy if exists "invoices_select_own" on public.invoices;
+create policy "invoices_select_own"
   on public.invoices for select
   using (auth.uid() = user_id);
 
-create policy if not exists "invoices_insert_own"
+drop policy if exists "invoices_insert_own" on public.invoices;
+create policy "invoices_insert_own"
   on public.invoices for insert
   with check (auth.uid() = user_id);
 
-create policy if not exists "invoices_update_own"
+drop policy if exists "invoices_update_own" on public.invoices;
+create policy "invoices_update_own"
   on public.invoices for update
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create policy if not exists "invoices_delete_own"
+drop policy if exists "invoices_delete_own" on public.invoices;
+create policy "invoices_delete_own"
   on public.invoices for delete
   using (auth.uid() = user_id);
 

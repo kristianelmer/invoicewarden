@@ -22,11 +22,17 @@ Last updated: 2026-03-25
 - `727b657` feat: scaffold new_project app shell with auth and Supabase-backed customers/invoices
 
 ## Pending / Next
-1. Apply migration in Supabase environment and verify with real auth sessions.
+1. Verify real auth session CRUD against the now-applied remote migration.
 2. Expand UK legal matrix with edge cases + legal wording compliance notes.
 3. Implement IW-9001 professional PDF generation for reminder attachments.
 4. Implement IW-9002/9003/9004 Stripe connect/payment + 20% additional-recovery split.
 5. Add integration tests for APIs + auth edge cases.
+
+## Migration Status
+- `npx supabase link --project-ref iarsienmgydrnkwzqbxj` ✅
+- `npx supabase db push` ✅
+- Local migration history in `new_project/supabase/migrations` synced to include prior remote versions (2026032318... through 2026032409...).
+- `20260325083000_core_customers_invoices.sql` updated to use `drop policy if exists` + `create policy` for compatibility.
 
 ## Risks / Notes
 - Migration has not yet been applied to remote DB in this session.
