@@ -1,44 +1,15 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Root workspace for InvoiceWarden rebuild
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# New project artifacts
+new_project/node_modules/
+new_project/.next/
+new_project/.env.local
 
-# testing
-/coverage
+# Old project artifacts (archive/reference only)
+old_project/node_modules/
+old_project/.next/
+old_project/.env.local
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
+# Generic
 .DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# supabase local cli cache
-supabase/.temp/
+*.log

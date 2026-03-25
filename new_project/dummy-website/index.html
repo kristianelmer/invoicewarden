@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InvoiceWarden — Dummy MLP</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="wrap">
+      <h1>InvoiceWarden</h1>
+      <p class="sub">Collect legally mandated interest on unpaid invoices.</p>
+    </header>
+
+    <main class="wrap grid">
+      <section class="card">
+        <h2>Jurisdiction</h2>
+        <label for="jurisdiction">Choose region</label>
+        <select id="jurisdiction">
+          <option value="uk">United Kingdom (active)</option>
+          <option value="ny" disabled>New York (coming soon)</option>
+          <option value="ca" disabled>California (coming soon)</option>
+        </select>
+        <p id="jurisdiction-note">UK rules are active in v1.</p>
+      </section>
+
+      <section class="card">
+        <h2>Core Recovery Loop</h2>
+        <ol>
+          <li>Create customer + invoice</li>
+          <li>Calculate legal interest/fees</li>
+          <li>Generate compliant reminder</li>
+          <li>Send + retry safely</li>
+          <li>Reconcile payment into ledger</li>
+        </ol>
+      </section>
+
+      <section class="card span-2">
+        <h2>Dummy Dashboard</h2>
+        <div class="tabs">
+          <button class="tab active">Invoices</button>
+          <button class="tab">Customers</button>
+          <button class="tab">Activity</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Principal</th>
+              <th>Interest</th>
+              <th>Fees</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>INV-1001</td>
+              <td>£1,200</td>
+              <td>£38.40</td>
+              <td>£40.00</td>
+              <td><span class="pill overdue">Overdue</span></td>
+            </tr>
+            <tr>
+              <td>INV-1002</td>
+              <td>£800</td>
+              <td>£0.00</td>
+              <td>£0.00</td>
+              <td><span class="pill paid">Paid</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
