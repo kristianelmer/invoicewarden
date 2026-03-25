@@ -13,6 +13,10 @@ Last updated: 2026-03-25
 ## Verification
 - `npm run build` ✅
 
+## Git Checkpoints
+- `05f2441` chore: split repo into old_project archive and new_project rebuild workspace
+- `727b657` feat: scaffold new_project app shell with auth and Supabase-backed customers/invoices
+
 ## Pending / Next
 1. Apply migration in Supabase environment and verify with real auth sessions.
 2. Add integration tests for APIs + auth edge cases.
