@@ -58,6 +58,12 @@ export default async function ActivityPage() {
             {rows.map((row) => {
               const amount = moneyFromCents(row.payload?.amount_total_cents);
               const fee = moneyFromCents(row.payload?.platform_fee_cents);
+              const eventId =
+                typeof row.payload?.stripe_event_id === 'string' ? row.payload.stripe_event_id : null;
+              const checkoutSessionId =
+                typeof row.payload?.stripe_checkout_session_id === 'string'
+                  ? row.payload.stripe_checkout_session_id
+                  : null;
               return (
                 <li key={row.id} style={{ border: '1px solid #2a2a2a', borderRadius: 10, padding: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
@@ -69,6 +75,13 @@ export default async function ActivityPage() {
                     {amount ? ` · Amount: ${amount}` : ''}
                     {fee ? ` · Platform fee: ${fee}` : ''}
                   </div>
+                  {(eventId || checkoutSessionId) && (
+                    <div className="subtle" style={{ marginTop: 4, fontSize: 12 }}>
+                      {eventId ? `Stripe event: ${eventId}` : ''}
+                      {eventId && checkoutSessionId ? ' · ' : ''}
+                      {checkoutSessionId ? `Checkout session: ${checkoutSessionId}` : ''}
+                    </div>
+                  )}
                 </li>
               );
             })}
