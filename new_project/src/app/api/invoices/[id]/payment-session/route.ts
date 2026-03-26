@@ -111,7 +111,35 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     metadata: {
       userId: auth.user.id,
       invoiceId: invoiceRes.data.id,
-      invoiceNumber: invoiceRes.data.invoice_number
+      invoiceNumber: invoiceRes.data.invoice_number,
+      principalCents: String(poundsToCents(principal)),
+      additionalRecoveryCents: String(additionalRecoveryCents),
+      platformFeeCents: String(platformFeeCents),
+      platformFeePercent: String(PLATFORM_FEE_PERCENT)
+    }
+  });
+
+  await supabase
+    .from('invoices')
+    .update({
+      payment_url: session.url,
+      stripe_checkout_session_id: session.id
+    })
+    .eq('id', invoiceRes.data.id)
+    .eq('user_id', auth.user.id);
+
+  await supabase.from('invoice_events').insert({
+    user_id: auth.user.id,
+    invoice_id: invoiceRes.data.id,
+    event_type: 'payment_session_created',
+    payload: {
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id:
+        typeof session.payment_intent === 'string' ? session.payment_intent : null,
+      amount_cents: totalAmountCents,
+      principal_cents: poundsToCents(principal),
+      additional_recovery_cents: additionalRecoveryCents,
+      platform_fee_cents: platformFeeCents
     }
   });
 

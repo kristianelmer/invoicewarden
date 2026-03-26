@@ -3,6 +3,8 @@
 Last updated: 2026-03-25
 
 ## Completed
+- IW-9003/9004 (extended): Stripe reconciliation path added via `/api/stripe/webhook` + invoice persistence (`stripe_checkout_session_id`, `stripe_payment_intent_id`, paid/split cents fields) + payment audit events.
+- IW-6003 (partial): Activity dashboard now renders recent `invoice_events` timeline with payment amounts/fees.
 - IW-9003/9004 (baseline): Invoice payment-session API added with Stripe Checkout + 20% fee on additional recovery only.
 - IW-9002 (baseline): Stripe Connect onboarding + status API routes added.
 - IW-9001 (baseline): Professional invoice PDF service + invoice PDF API route (`/api/invoices/[id]/pdf`) added.
