@@ -13,3 +13,4 @@ old_project/.env.local
 # Generic
 .DS_Store
 *.log
+.vercel

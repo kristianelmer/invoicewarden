@@ -14,7 +14,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
 
   const invoiceRes = await supabase
     .from('invoices')
-    .select('id, customer_id, invoice_number, principal, due_date, currency, created_at')
+    .select('id, customer_id, invoice_number, amount_cents, due_date, currency, created_at')
     .eq('id', id)
     .single();
 
@@ -31,7 +31,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
   const customerName = customerRes.data?.name ?? 'Customer';
   const customerEmail = customerRes.data?.email ?? undefined;
 
-  const principal = Number(invoiceRes.data.principal);
+  const principal = Number(invoiceRes.data.amount_cents) / 100;
   const dueDate = invoiceRes.data.due_date;
   const asOfDate = new Date().toISOString().slice(0, 10);
 

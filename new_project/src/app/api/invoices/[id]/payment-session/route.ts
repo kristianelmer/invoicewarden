@@ -21,7 +21,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
 
   const invoiceRes = await supabase
     .from('invoices')
-    .select('id, user_id, customer_id, invoice_number, principal, due_date, currency, status')
+    .select('id, user_id, customer_id, invoice_number, amount_cents, due_date, currency, status')
     .eq('id', id)
     .eq('user_id', auth.user.id)
     .maybeSingle();
@@ -58,7 +58,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     );
   }
 
-  const principal = Number(invoiceRes.data.principal);
+  const principal = Number(invoiceRes.data.amount_cents) / 100;
   const claim = calculateUkLatePaymentClaim({
     principal,
     dueDate: invoiceRes.data.due_date,

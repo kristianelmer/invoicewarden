@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Customer = {
   id: string;
@@ -18,15 +18,20 @@ export function CustomersManager() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  async function loadCustomers() {
-    const res = await fetch("/api/customers", { cache: "no-store" });
-    const json = await res.json();
-    setCustomers(json.data ?? []);
-  }
+  const loadCustomers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/customers", { cache: "no-store" });
+      const json = await res.json();
+      setCustomers(json.data ?? []);
+    } catch {
+      setError("Could not load customers.");
+    }
+  }, []);
 
   useEffect(() => {
-    loadCustomers().catch(() => setError("Could not load customers."));
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadCustomers();
+  }, [loadCustomers]);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();

@@ -43,25 +43,6 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
-  const guardInsert = await supabase
-    .from('stripe_webhook_events')
-    .insert({
-      stripe_event_id: event.id,
-      event_type: event.type,
-      payload: {
-        checkout_session_id: session.id,
-        invoice_id: invoiceId,
-        user_id: userId
-      }
-    });
-
-  if (guardInsert.error) {
-    if (guardInsert.error.code === '23505') {
-      return NextResponse.json({ received: true, duplicate: true });
-    }
-    return NextResponse.json({ error: guardInsert.error.message }, { status: 400 });
-  }
-
   const paidAt = new Date((event.created || Math.floor(Date.now() / 1000)) * 1000).toISOString();
 
   const amountTotalCents = session.amount_total ?? null;
@@ -69,7 +50,7 @@ export async function POST(request: Request) {
   const additionalRecoveryCents = toInt(metadata.additionalRecoveryCents);
   let platformFeeCents = toInt(metadata.platformFeeCents);
 
-  let paymentIntentId: string | null =
+  const paymentIntentId: string | null =
     typeof session.payment_intent === 'string' ? session.payment_intent : null;
 
   if (paymentIntentId && platformFeeCents === null) {
@@ -95,10 +76,16 @@ export async function POST(request: Request) {
     })
     .eq('id', invoiceId)
     .eq('user_id', userId)
-    .neq('status', 'paid');
+    .neq('status', 'paid')
+    .select('id');
 
   if (updateRes.error) {
     return NextResponse.json({ error: updateRes.error.message }, { status: 400 });
+  }
+
+  const updatedInvoice = updateRes.data?.[0];
+  if (!updatedInvoice) {
+    return NextResponse.json({ received: true, already_processed: true });
   }
 
   const eventInsert = await supabase.from('invoice_events').insert({
@@ -120,6 +107,20 @@ export async function POST(request: Request) {
 
   if (eventInsert.error) {
     return NextResponse.json({ error: eventInsert.error.message }, { status: 400 });
+  }
+
+  const guardInsert = await supabase.from('stripe_webhook_events').insert({
+    stripe_event_id: event.id,
+    event_type: event.type,
+    payload: {
+      checkout_session_id: session.id,
+      invoice_id: invoiceId,
+      user_id: userId
+    }
+  });
+
+  if (guardInsert.error && guardInsert.error.code !== '23505') {
+    return NextResponse.json({ error: guardInsert.error.message }, { status: 400 });
   }
 
   return NextResponse.json({ received: true });

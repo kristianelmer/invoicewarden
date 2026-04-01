@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Customer = { id: string; name: string };
 type Invoice = {
@@ -10,6 +10,8 @@ type Invoice = {
   principal: number;
   dueDate: string;
   currency: string;
+  status?: string;
+  paymentUrl?: string | null;
 };
 
 function formatMoney(value: number, currency: string) {
@@ -31,27 +33,69 @@ export function InvoicesManager() {
   const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [rowActionLoading, setRowActionLoading] = useState<Record<string, boolean>>({});
 
-  async function loadAll() {
-    const [cRes, iRes] = await Promise.all([
-      fetch("/api/customers", { cache: "no-store" }),
-      fetch("/api/invoices", { cache: "no-store" })
-    ]);
-    const cJson = await cRes.json();
-    const iJson = await iRes.json();
-    setCustomers(cJson.data ?? []);
-    setInvoices(iJson.data ?? []);
-    if (!customerId && cJson.data?.[0]?.id) setCustomerId(cJson.data[0].id);
-  }
+  const loadAll = useCallback(async () => {
+    try {
+      const [cRes, iRes] = await Promise.all([
+        fetch("/api/customers", { cache: "no-store" }),
+        fetch("/api/invoices", { cache: "no-store" })
+      ]);
+      const cJson = await cRes.json();
+      const iJson = await iRes.json();
+      setCustomers(cJson.data ?? []);
+      setInvoices(iJson.data ?? []);
+      setCustomerId((prev) => prev || cJson.data?.[0]?.id || "");
+    } catch {
+      setError("Could not load invoices.");
+    }
+  }, []);
 
   useEffect(() => {
-    loadAll().catch(() => setError("Could not load invoices."));
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadAll();
+  }, [loadAll]);
 
   const customerName = useMemo(() => {
     const map = new Map(customers.map((c) => [c.id, c.name]));
     return (id: string) => map.get(id) ?? "Unknown";
   }, [customers]);
+
+  async function createPaymentSession(invoiceId: string) {
+    setError(null);
+    setRowActionLoading((prev) => ({ ...prev, [invoiceId]: true }));
+
+    const res = await fetch(`/api/invoices/${invoiceId}/payment-session`, { method: "POST" });
+    const json = await res.json();
+
+    setRowActionLoading((prev) => ({ ...prev, [invoiceId]: false }));
+
+    if (!res.ok) {
+      setError(json.error ?? "Could not create payment session.");
+      return;
+    }
+
+    const paymentUrl = json.paymentUrl as string | undefined;
+    if (paymentUrl) {
+      window.open(paymentUrl, "_blank", "noopener,noreferrer");
+    }
+
+    await loadAll();
+  }
+
+  async function copyPaymentUrl(invoice: Invoice) {
+    const url = invoice.paymentUrl;
+    if (!url) {
+      setError("No payment URL yet. Create a payment session first.");
+      return;
+    }
+
+    await navigator.clipboard.writeText(url);
+  }
+
+  function openPdf(invoiceId: string) {
+    window.open(`/api/invoices/${invoiceId}/pdf`, "_blank", "noopener,noreferrer");
+  }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -117,6 +161,7 @@ export function InvoicesManager() {
                 <th align="left">Due date</th>
                 <th align="left">Principal</th>
                 <th align="left">Status</th>
+                <th align="left">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -126,7 +171,24 @@ export function InvoicesManager() {
                   <td>{customerName(i.customerId)}</td>
                   <td>{i.dueDate}</td>
                   <td>{formatMoney(i.principal, i.currency)}</td>
-                  <td>{getStatus(i.dueDate)}</td>
+                  <td>{(i.status ?? getStatus(i.dueDate)).toUpperCase()}</td>
+                  <td>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => createPaymentSession(i.id)}
+                        disabled={Boolean(rowActionLoading[i.id])}
+                      >
+                        {rowActionLoading[i.id] ? "Creating..." : "Pay link"}
+                      </button>
+                      <button type="button" onClick={() => copyPaymentUrl(i)}>
+                        Copy link
+                      </button>
+                      <button type="button" onClick={() => openPdf(i.id)}>
+                        PDF
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

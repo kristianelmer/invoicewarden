@@ -9,7 +9,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("invoices")
-    .select("id, customer_id, invoice_number, principal, due_date, currency, status, created_at")
+    .select("id, customer_id, invoice_number, amount_cents, due_date, currency, status, payment_url, created_at")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -18,10 +18,11 @@ export async function GET() {
     id: row.id,
     customerId: row.customer_id,
     invoiceNumber: row.invoice_number,
-    principal: Number(row.principal),
+    principal: Number(row.amount_cents) / 100,
     dueDate: row.due_date,
     currency: row.currency,
     status: row.status,
+    paymentUrl: row.payment_url,
     createdAt: row.created_at
   }));
 
@@ -50,10 +51,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Customer not found." }, { status: 404 });
   }
 
+  const dueDate = new Date(`${parsed.data.dueDate}T00:00:00Z`);
+  const issueDate = new Date(dueDate);
+  issueDate.setUTCDate(issueDate.getUTCDate() - 1);
+
   const payload = {
     customer_id: parsed.data.customerId,
     invoice_number: parsed.data.invoiceNumber.trim(),
-    principal: parsed.data.principal,
+    amount_cents: Math.round(parsed.data.principal * 100),
+    issue_date: issueDate.toISOString().slice(0, 10),
     due_date: parsed.data.dueDate,
     currency: parsed.data.currency.toUpperCase()
   };
@@ -61,7 +67,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("invoices")
     .insert(payload)
-    .select("id, customer_id, invoice_number, principal, due_date, currency, status, created_at")
+    .select("id, customer_id, invoice_number, amount_cents, due_date, currency, status, payment_url, created_at")
     .single();
 
   if (error) {
@@ -75,10 +81,11 @@ export async function POST(request: Request) {
         id: data.id,
         customerId: data.customer_id,
         invoiceNumber: data.invoice_number,
-        principal: Number(data.principal),
+        principal: Number(data.amount_cents) / 100,
         dueDate: data.due_date,
         currency: data.currency,
         status: data.status,
+        paymentUrl: data.payment_url,
         createdAt: data.created_at
       }
     },
