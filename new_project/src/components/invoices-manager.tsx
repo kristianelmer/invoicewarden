@@ -32,6 +32,7 @@ export function InvoicesManager() {
   const [principal, setPrincipal] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [rowActionLoading, setRowActionLoading] = useState<Record<string, boolean>>({});
 
@@ -63,6 +64,7 @@ export function InvoicesManager() {
 
   async function createPaymentSession(invoiceId: string) {
     setError(null);
+    setNotice(null);
     setRowActionLoading((prev) => ({ ...prev, [invoiceId]: true }));
 
     const res = await fetch(`/api/invoices/${invoiceId}/payment-session`, { method: "POST" });
@@ -84,6 +86,9 @@ export function InvoicesManager() {
   }
 
   async function copyPaymentUrl(invoice: Invoice) {
+    setError(null);
+    setNotice(null);
+
     const url = invoice.paymentUrl;
     if (!url) {
       setError("No payment URL yet. Create a payment session first.");
@@ -91,6 +96,43 @@ export function InvoicesManager() {
     }
 
     await navigator.clipboard.writeText(url);
+    setNotice(`Copied payment link for ${invoice.invoiceNumber}.`);
+  }
+
+  async function markPaidManually(invoice: Invoice) {
+    setError(null);
+    setNotice(null);
+
+    const confirmed = window.confirm(
+      `Mark invoice ${invoice.invoiceNumber} as paid manually? Use this only when webhook reconciliation fails.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setRowActionLoading((prev) => ({ ...prev, [invoice.id]: true }));
+
+    const res = await fetch(`/api/invoices/${invoice.id}/mark-paid`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reason: "Manual fallback via dashboard invoice actions",
+        paidAmountCents: Math.round(invoice.principal * 100)
+      })
+    });
+
+    const json = await res.json();
+
+    setRowActionLoading((prev) => ({ ...prev, [invoice.id]: false }));
+
+    if (!res.ok) {
+      setError(json.error ?? "Could not mark invoice as paid manually.");
+      return;
+    }
+
+    setNotice(`Invoice ${invoice.invoiceNumber} marked as paid manually.`);
+    await loadAll();
   }
 
   function openPdf(invoiceId: string) {
@@ -100,6 +142,7 @@ export function InvoicesManager() {
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    setNotice(null);
     setSaving(true);
 
     const res = await fetch("/api/invoices", {
@@ -153,6 +196,7 @@ export function InvoicesManager() {
         {invoices.length === 0 ? (
           <p className="subtle">No invoices yet.</p>
         ) : (
+          <>
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
             <thead>
               <tr>
@@ -165,34 +209,54 @@ export function InvoicesManager() {
               </tr>
             </thead>
             <tbody>
-              {invoices.map((i) => (
-                <tr key={i.id}>
-                  <td>{i.invoiceNumber}</td>
-                  <td>{customerName(i.customerId)}</td>
-                  <td>{i.dueDate}</td>
-                  <td>{formatMoney(i.principal, i.currency)}</td>
-                  <td>{(i.status ?? getStatus(i.dueDate)).toUpperCase()}</td>
-                  <td>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <button
-                        type="button"
-                        onClick={() => createPaymentSession(i.id)}
-                        disabled={Boolean(rowActionLoading[i.id])}
-                      >
-                        {rowActionLoading[i.id] ? "Creating..." : "Pay link"}
-                      </button>
-                      <button type="button" onClick={() => copyPaymentUrl(i)}>
-                        Copy link
-                      </button>
-                      <button type="button" onClick={() => openPdf(i.id)}>
-                        PDF
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {invoices.map((i) => {
+                const status = (i.status ?? getStatus(i.dueDate)).toUpperCase();
+                const isPaid = status === "PAID";
+
+                return (
+                  <tr key={i.id}>
+                    <td>{i.invoiceNumber}</td>
+                    <td>{customerName(i.customerId)}</td>
+                    <td>{i.dueDate}</td>
+                    <td>{formatMoney(i.principal, i.currency)}</td>
+                    <td>{status}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          onClick={() => createPaymentSession(i.id)}
+                          disabled={Boolean(rowActionLoading[i.id]) || isPaid}
+                        >
+                          {rowActionLoading[i.id] ? "Working..." : "Pay link"}
+                        </button>
+                        <button type="button" onClick={() => copyPaymentUrl(i)} disabled={isPaid}>
+                          Copy link
+                        </button>
+                        <button type="button" onClick={() => openPdf(i.id)}>
+                          PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => markPaidManually(i)}
+                          disabled={Boolean(rowActionLoading[i.id]) || isPaid}
+                          title="Use when Stripe webhook reconciliation fails"
+                        >
+                          {rowActionLoading[i.id] ? "Working..." : "Mark paid (manual)"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+          <p className="subtle" style={{ marginTop: 10 }}>
+            Runbook hint: if a successful Stripe payment does not reconcile within ~2 minutes, check webhook delivery logs,
+            then use <strong>Mark paid (manual)</strong> and verify the event in Activity.
+          </p>
+          {notice ? <p style={{ color: "#22c55e", marginTop: 8 }}>{notice}</p> : null}
+          {error ? <p style={{ color: "#ef4444", marginTop: 8 }}>{error}</p> : null}
+          </>
         )}
       </div>
     </div>

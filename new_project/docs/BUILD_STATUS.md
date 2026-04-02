@@ -1,8 +1,9 @@
 # Build Status
 
-Last updated: 2026-03-25
+Last updated: 2026-04-02
 
 ## Completed
+- Slice 4 (manual fallback + observability): Added `POST /api/invoices/[id]/mark-paid` manual paid fallback with `invoice_marked_paid_manual` event logging, invoice action button, and runbook hints in invoices/activity UI.
 - IW-9003/9004 (extended): Stripe reconciliation path added via `/api/stripe/webhook` + invoice persistence (`stripe_checkout_session_id`, `stripe_payment_intent_id`, paid/split cents fields) + payment audit events.
 - IW-7003 (partial): Ops runbook added for Stripe reconciliation deployment/verification/idempotency replay (`docs/OPS_RUNBOOK.md`).
 - IW-6003 (partial): Activity dashboard now renders recent `invoice_events` timeline with payment amounts/fees.

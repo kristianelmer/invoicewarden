@@ -16,6 +16,8 @@ function labelForEvent(eventType: string) {
       return 'Payment session created';
     case 'payment_succeeded':
       return 'Payment succeeded';
+    case 'invoice_marked_paid_manual':
+      return 'Marked paid manually';
     default:
       return eventType.replaceAll('_', ' ');
   }
@@ -47,6 +49,10 @@ export default async function ActivityPage() {
     <DashboardShell active="Activity">
       <h1>Activity</h1>
       <p className="subtle">Timeline of payment sessions, sends, retries, and paid events.</p>
+      <p className="subtle" style={{ marginTop: 6 }}>
+        Runbook hint: when payment state looks stale, compare the latest event IDs here with Stripe webhook delivery logs,
+        then use manual mark-paid fallback only if reconciliation is clearly stuck.
+      </p>
 
       <div className="card" style={{ marginTop: 16 }}>
         {error ? (
@@ -56,7 +62,11 @@ export default async function ActivityPage() {
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
             {rows.map((row) => {
-              const amount = moneyFromCents(row.payload?.amount_total_cents);
+              const amount = moneyFromCents(
+                row.payload?.amount_total_cents ?? row.payload?.paid_amount_cents ?? row.payload?.amount_cents
+              );
+              const principal = moneyFromCents(row.payload?.principal_cents);
+              const recovery = moneyFromCents(row.payload?.additional_recovery_cents);
               const fee = moneyFromCents(row.payload?.platform_fee_cents);
               const eventId =
                 typeof row.payload?.stripe_event_id === 'string' ? row.payload.stripe_event_id : null;
@@ -64,6 +74,11 @@ export default async function ActivityPage() {
                 typeof row.payload?.stripe_checkout_session_id === 'string'
                   ? row.payload.stripe_checkout_session_id
                   : null;
+              const paymentIntentId =
+                typeof row.payload?.stripe_payment_intent_id === 'string'
+                  ? row.payload.stripe_payment_intent_id
+                  : null;
+              const reason = typeof row.payload?.reason === 'string' ? row.payload.reason : null;
               return (
                 <li key={row.id} style={{ border: '1px solid #2a2a2a', borderRadius: 10, padding: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
@@ -73,15 +88,24 @@ export default async function ActivityPage() {
                   <div className="subtle" style={{ marginTop: 6 }}>
                     Invoice: {row.invoices?.invoice_number ?? '—'}
                     {amount ? ` · Amount: ${amount}` : ''}
+                    {principal ? ` · Principal: ${principal}` : ''}
+                    {recovery ? ` · Recovery: ${recovery}` : ''}
                     {fee ? ` · Platform fee: ${fee}` : ''}
                   </div>
-                  {(eventId || checkoutSessionId) && (
+                  {(eventId || checkoutSessionId || paymentIntentId) && (
                     <div className="subtle" style={{ marginTop: 4, fontSize: 12 }}>
                       {eventId ? `Stripe event: ${eventId}` : ''}
                       {eventId && checkoutSessionId ? ' · ' : ''}
                       {checkoutSessionId ? `Checkout session: ${checkoutSessionId}` : ''}
+                      {(eventId || checkoutSessionId) && paymentIntentId ? ' · ' : ''}
+                      {paymentIntentId ? `Payment intent: ${paymentIntentId}` : ''}
                     </div>
                   )}
+                  {reason ? (
+                    <div className="subtle" style={{ marginTop: 4, fontSize: 12 }}>
+                      Note: {reason}
+                    </div>
+                  ) : null}
                 </li>
               );
             })}

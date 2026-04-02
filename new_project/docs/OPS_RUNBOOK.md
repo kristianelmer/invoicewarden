@@ -6,6 +6,7 @@ Last updated: 2026-03-26
 This runbook verifies InvoiceWarden Stripe payment reconciliation for:
 - checkout session creation
 - webhook-driven paid-state updates
+- manual mark-paid fallback with event traceability
 - 20% platform fee tracking on additional recovery
 - idempotent handling of duplicate Stripe webhooks
 
@@ -85,9 +86,18 @@ Contains at least:
 - Missing invoice updates:
   - verify metadata contains `userId` and `invoiceId`
   - verify service role key is present and valid
+  - verify whether Stripe delivered `checkout.session.completed`
 - Fee mismatch:
   - verify metadata `platformFeeCents`
   - fallback checks `paymentIntent.application_fee_amount`
+
+## Manual fallback (webhook edge-cases)
+Use only when payment is confirmed in Stripe and reconciliation remains stuck after triage.
+
+1. Open **Invoices** and click `Mark paid (manual)` on the affected invoice.
+2. Confirm action in prompt.
+3. Open **Activity** and verify `Marked paid manually` event exists for the invoice.
+4. Include invoice number + activity timestamp in incident notes for later reconciliation review.
 
 ## Rollback stance
 - Webhook route can stay enabled even if UI temporarily lags.
