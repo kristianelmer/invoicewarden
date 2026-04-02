@@ -85,8 +85,29 @@ Ship a production-ready v1 flow that is genuinely usable end-to-end:
 - [ ] Payment reconciliation reflected in UI
 - [ ] Settings persist and reload
 - [ ] Reminder ops visible and actionable
-- [ ] Manual fallback available
-- [ ] Lint/test pass
+- [x] Manual fallback available
+- [x] Lint/test pass
+
+### Slice 5 Smoke Pass (2026-04-02 UTC)
+Automated production checks executed against `https://www.invoicewarden.com`:
+- `GET /` = 200
+- `GET /login` = 200
+- Protected dashboard routes redirect to login (`307 -> /login`):
+  - `/dashboard`
+  - `/dashboard/invoices`
+  - `/dashboard/settings`
+  - `/dashboard/reminders`
+  - `/dashboard/activity`
+- Unauthenticated API guard checks return `401` as expected:
+  - `GET /api/invoices`
+  - `GET /api/customers`
+  - `GET /api/reminders`
+  - `GET /api/settings`
+  - `POST /api/invoices/test/mark-paid`
+
+Limitations of this smoke run:
+- Browser automation is currently unavailable in this environment, so authenticated end-to-end UI actions (create invoice, payment launch, settings save, reminders retry, reconciliation visibility) could not be fully exercised from this host in this run.
+- Manual fallback endpoint availability and auth guard are confirmed; full in-app operator flow still needs one authenticated click-through verification.
 
 ## Delivery Approach
 - Implement in thin vertical slices; deploy safely after each slice.
