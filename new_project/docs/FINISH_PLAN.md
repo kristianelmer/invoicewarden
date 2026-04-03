@@ -87,6 +87,19 @@ Ship a production-ready v1 flow that is genuinely usable end-to-end:
 - [ ] Reminder ops visible and actionable
 - [x] Manual fallback available
 - [x] Lint/test pass
+- [x] Build pass (`npm run build`)
+
+### Release Gate Evidence (2026-04-03 UTC)
+- Local quality gates pass in `new_project`:
+  - `npm run lint` ✅
+  - `npm test` ✅ (4 tests)
+  - `npm run build` ✅
+- Critical UI surfaces are implemented and wired:
+  - invoice actions (payment session, copy link, PDF, manual mark-paid)
+  - persisted settings + Stripe connect status/onboarding
+  - reminders grouped by state with retry on failures
+  - activity timeline with reconciliation IDs and amount breakdown
+- Remaining blocker for checking the five unchecked release-gate boxes: authenticated end-to-end UI/API verification still requires a working browser session with login in this environment.
 
 ### Slice 5 Smoke Pass (2026-04-02 UTC)
 Automated production checks executed against `https://www.invoicewarden.com`:

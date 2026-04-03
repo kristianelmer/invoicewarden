@@ -4,6 +4,10 @@
 new_project/node_modules/
 new_project/.next/
 new_project/.env.local
+new_project/supabase/.temp/
+
+# Local deployment env exports (never commit secrets)
+.env.vercel.production
 
 # Old project artifacts (archive/reference only)
 old_project/node_modules/
