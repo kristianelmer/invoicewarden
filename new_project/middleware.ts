@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest) {
 
   const hasSessionCookie = request.cookies
     .getAll()
-    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.endsWith("-auth-token"));
+    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token"));
 
   if (!hasSessionCookie) {
     if (pathname.startsWith("/api/")) {
